@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"github.com/labstack/echo/v4"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 // Структура для хранения метрик
@@ -19,10 +21,15 @@ func (m MemStorage) Set(name string, metric interface{}) {
 	m.metrics[name] = metric
 }
 
+func (m MemStorage) GetAll() map[string]interface{} {
+	return m.metrics
+}
+
 // Интерфейс для работы с хранилищем
 type Storage interface {
 	Get(name string) interface{}
 	Set(name string, metric interface{})
+	GetAll() map[string]interface{}
 }
 
 // Структура метрики Gauge
@@ -34,6 +41,10 @@ type Gauge struct {
 // Метод Set для Gauge
 func (g *Gauge) Set(value float64) {
 	g.value = value
+}
+
+func (g *Gauge) GetName() float64 {
+	return g.value
 }
 
 // Структура метрики Counter
@@ -50,81 +61,97 @@ func (c *Counter) Inc(delta int64) {
 // Хранилище метрик
 var storage Storage
 
-func AddMetric(res http.ResponseWriter, req *http.Request) {
+func AddMetric(c echo.Context) error {
+	typeMetric := c.Param("type_metric")
+	nameMetric := c.Param("name_metric")
+	valueMetric := c.Param("value_metric")
 
-	if req.Method != http.MethodPost {
-		http.Error(res, "Only POST requests are allowed!", http.StatusMethodNotAllowed)
-		return
-	}
-
-	//Нужна ли проверка на заголовок Content-Type?
-	//if req.Header.Get("Content-Type") != "text/plain" {
-	//
-	//}
-
-	parts := strings.Split(req.URL.Path, "/")
-
-	if len(parts) != 5 {
-		http.Error(res, "Bad request", http.StatusBadRequest)
-		return
-	}
-
-	//Как определить, что в запросе нет имени метрики?
-
-	metricType := parts[2]
-	name := parts[3]
-	valueMetric := parts[4]
-
-	var value interface{}
-	if valueInt, err := strconv.ParseInt(valueMetric, 10, 64); err == nil {
-		value = valueInt
-	} else if valueFloat, err := strconv.ParseFloat(valueMetric, 64); err == nil {
-		value = valueFloat
+	var valueMet interface{}
+	if typeMetric == "gauge" {
+		valueInt, _ := strconv.ParseFloat(valueMetric, 64)
+		valueMet = valueInt
+	} else if typeMetric == "counter" {
+		valueInt, _ := strconv.ParseInt(valueMetric, 10, 64)
+		valueMet = valueInt
 	} else {
-		http.Error(res, "Bad request", http.StatusBadRequest)
-		return
+		return c.String(http.StatusBadRequest, "")
 	}
 
-	// Получаем метрику из хранилища
-	metric := storage.Get(name)
+	metric := storage.Get(nameMetric)
 
-	// Обновляем значение
 	switch m := metric.(type) {
 	case *Gauge:
-		m.Set(value.(float64))
+		m.Set(valueMet.(float64))
 	case *Counter:
-		m.Inc(value.(int64))
+		m.Inc(valueMet.(int64))
 	default:
 		// Создаем метрику, если ее нет
-		if metricType == "gauge" {
+		if typeMetric == "gauge" {
 			metric = &Gauge{
-				name:  name,
-				value: value.(float64),
+				name:  nameMetric,
+				value: valueMet.(float64),
 			}
-		} else if metricType == "counter" {
+		} else if typeMetric == "counter" {
 			metric = &Counter{
-				name:  name,
-				value: value.(int64),
+				name:  nameMetric,
+				value: valueMet.(int64),
 			}
 		} else {
-			http.Error(res, "Bad request", http.StatusBadRequest)
-			return
+			return c.String(http.StatusBadRequest, "")
 		}
-		storage.Set(name, metric)
-		m = metric
-
-		res.WriteHeader(http.StatusOK)
+		storage.Set(nameMetric, metric)
 	}
+	return c.String(http.StatusOK, "")
+
+}
+
+func getMetric(c echo.Context) error {
+	name := c.Param("name_metric")
+	metric := storage.Get(name)
+
+	switch m := metric.(type) {
+	case *Gauge:
+		return c.String(http.StatusOK, fmt.Sprintf("%f", m.value))
+
+	case *Counter:
+		return c.String(http.StatusOK, fmt.Sprintf("%d", m.value))
+
+	default:
+		return c.String(http.StatusNotFound, "")
+	}
+
+}
+
+func getAllMetrics(c echo.Context) error {
+	metrics := storage.GetAll()
+
+	var buf bytes.Buffer
+
+	buf.WriteString("<html><body><ul>")
+
+	for name, value := range metrics {
+		buf.WriteString(fmt.Sprintf("<li>%s: %v</li>", name, value))
+	}
+
+	buf.WriteString("</ul></body></html>")
+
+	return c.HTML(http.StatusOK, buf.String())
 }
 
 func main() {
-	http.HandleFunc(`/update/`, AddMetric)
+	e := echo.New()
+
+	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)
+	e.GET("/value/:type_metric/:name_metric", getMetric)
+	e.GET("/", getAllMetrics)
 
 	storage = &MemStorage{
 		metrics: make(map[string]interface{}),
 	}
 
-	err := http.ListenAndServe(`:80`, nil)
+	//e.Logger.Fatal()
+
+	err := e.Start(":80")
 	if err != nil {
 		panic(err)
 	}

@@ -1,4 +1,6 @@
 // TODO не до конца понимаю, как реализовать условия из "Важно"
+// TODO переделать ассоциативный масссив на  map[string]interface{}???
+
 package main
 
 import (
@@ -19,17 +21,16 @@ type Num struct {
 }
 
 func (n *Num) Float64(num float64) string {
-	n.val = fmt.Sprint(num)
 	return n.val
 }
 
 func (n *Num) Uint64(num uint64) string {
-	n.val = fmt.Sprint(num)
+	n.val = fmt.Sprint(float64(num))
 	return n.val
 }
 
 func (n *Num) Uint32(num uint32) string {
-	n.val = fmt.Sprint(num)
+	n.val = fmt.Sprint(float64(num))
 	return n.val
 }
 
@@ -108,18 +109,19 @@ func collectPollCount(PollCount int64) map[string]string {
 }
 
 func collectRandomValue() string {
-	return fmt.Sprint(rand.Uint64())
+	return fmt.Sprint(rand.Float64())
 }
 
 func sendMetrics(metrics map[string]map[string]string) {
+	//не понимаю, как отправить запрос используя echo, не поднимая сервер
 	for key, types := range metrics {
 		for name, value := range types {
-			resp, _ := http.Post(
-				"http://localhost:80/update/"+key+"/"+name+"/"+value,
+			url := fmt.Sprintf("http://localhost/update/%s/%s/%s", key, name, value)
+			http.Post(
+				url,
 				"text/plain",
 				nil)
 
-			fmt.Sprintf("counter/%s", resp.Header)
 		}
 	}
 }
