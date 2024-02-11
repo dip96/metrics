@@ -1,6 +1,6 @@
 module github.com/dip96/metrics
 
-go 1.21.7
+go 1.22rc
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
