@@ -139,6 +139,8 @@ func getAllMetrics(c echo.Context) error {
 }
 
 func main() {
+	parseFlags()
+
 	e := echo.New()
 
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)
@@ -150,8 +152,8 @@ func main() {
 	}
 
 	//e.Logger.Fatal()
-
-	err := e.Start(":80")
+	fmt.Println("Running server on", flagRunAddr)
+	err := e.Start(flagRunAddr)
 	if err != nil {
 		panic(err)
 	}

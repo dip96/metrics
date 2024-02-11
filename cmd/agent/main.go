@@ -11,11 +11,6 @@ import (
 	"time"
 )
 
-const (
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
-)
-
 type Num struct {
 	val string
 }
@@ -35,17 +30,27 @@ func (n *Num) Uint32(num uint32) string {
 }
 
 func main() {
+	parseFlags()
+
+	//не до конца понимаю, как можно связать с http cервером
+	//e := echo.New()
+	//
+	//err := e.Start(flagRunAddr)
+	//if err != nil {
+	//	panic(err)
+	//}
+
 	lastSendTime := time.Now()
 	PollCount := int64(1)
 	for {
 		// собираем метрики
 		metrics := collectMetrics(PollCount)
-		if time.Since(lastSendTime) > reportInterval {
+		if time.Since(lastSendTime) > time.Duration(flagReportInterval) {
 			sendMetrics(metrics)
 			lastSendTime = time.Now()
 		}
 
-		time.Sleep(pollInterval)
+		time.Sleep(time.Duration(flagRuntime))
 		PollCount++
 	}
 }
