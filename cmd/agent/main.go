@@ -121,7 +121,7 @@ func sendMetrics(metrics map[string]map[string]string) {
 	//не понимаю, как отправить запрос используя echo, не поднимая сервер
 	for key, types := range metrics {
 		for name, value := range types {
-			url := fmt.Sprintf("http://localhost:8080/update/%s/%s/%s", key, name, value)
+			url := fmt.Sprintf("%s/update/%s/%s/%s", flagRunAddr, key, name, value)
 			http.Post(
 				url,
 				"text/plain",
