@@ -68,10 +68,18 @@ func AddMetric(c echo.Context) error {
 
 	var valueMet interface{}
 	if typeMetric == "gauge" {
-		valueInt, _ := strconv.ParseFloat(valueMetric, 64)
+		valueInt, err := strconv.ParseFloat(valueMetric, 64)
+		if err != nil {
+			return c.String(http.StatusBadRequest, "")
+		}
 		valueMet = valueInt
 	} else if typeMetric == "counter" {
-		valueInt, _ := strconv.ParseInt(valueMetric, 10, 64)
+		valueInt, err := strconv.ParseInt(valueMetric, 10, 64)
+
+		if err != nil {
+			return c.String(http.StatusBadRequest, "")
+		}
+
 		valueMet = valueInt
 	} else {
 		return c.String(http.StatusBadRequest, "")
