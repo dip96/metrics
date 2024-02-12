@@ -34,13 +34,18 @@ type Storage interface {
 
 // Структура метрики Gauge
 type Gauge struct {
-	name  string
-	value float64
+	name      string
+	value     float64
+	fullValue string //float64 обрезает нули
 }
 
 // Метод Set для Gauge
 func (g *Gauge) Set(value float64) {
 	g.value = value
+}
+
+func (g *Gauge) SetFullValue(value string) {
+	g.fullValue = value
 }
 
 func (g *Gauge) GetName() float64 {
@@ -90,14 +95,16 @@ func AddMetric(c echo.Context) error {
 	switch m := metric.(type) {
 	case *Gauge:
 		m.Set(valueMet.(float64))
+		m.SetFullValue(valueMetric)
 	case *Counter:
 		m.Inc(valueMet.(int64))
 	default:
 		// Создаем метрику, если ее нет
 		if typeMetric == "gauge" {
 			metric = &Gauge{
-				name:  nameMetric,
-				value: valueMet.(float64),
+				name:      nameMetric,
+				value:     valueMet.(float64),
+				fullValue: valueMetric,
 			}
 		} else if typeMetric == "counter" {
 			metric = &Counter{
@@ -119,7 +126,7 @@ func getMetric(c echo.Context) error {
 
 	switch m := metric.(type) {
 	case *Gauge:
-		return c.String(http.StatusOK, fmt.Sprintf("%.6f", m.value))
+		return c.String(http.StatusOK, m.fullValue)
 
 	case *Counter:
 		return c.String(http.StatusOK, fmt.Sprintf("%d", m.value))
