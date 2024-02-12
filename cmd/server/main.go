@@ -119,7 +119,7 @@ func getMetric(c echo.Context) error {
 
 	switch m := metric.(type) {
 	case *Gauge:
-		return c.String(http.StatusOK, fmt.Sprintf("%f", m.value))
+		return c.String(http.StatusOK, fmt.Sprintf("%.6f", m.value))
 
 	case *Counter:
 		return c.String(http.StatusOK, fmt.Sprintf("%d", m.value))
