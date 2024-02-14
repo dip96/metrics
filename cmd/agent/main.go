@@ -122,10 +122,19 @@ func sendMetrics(metrics map[string]map[string]string) {
 	for key, types := range metrics {
 		for name, value := range types {
 			url := fmt.Sprintf("http://%s/update/%s/%s/%s", flagRunAddr, key, name, value)
-			http.Post(
+			post, err := http.Post(
 				url,
 				"text/plain",
 				nil)
+
+			if err != nil {
+				return
+			}
+
+			errClose := post.Body.Close()
+			if errClose != nil {
+				return
+			}
 
 		}
 	}
