@@ -15,8 +15,6 @@ type Config struct {
 var conf Config
 
 func parseFlags() {
-	conf := Config{}
-
 	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
 	flag.IntVar(&conf.flagReportInterval, "r", 10, "address and port to run server")
 	flag.IntVar(&conf.flagRuntime, "p", 2, "address and port to run server")
