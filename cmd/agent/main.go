@@ -15,7 +15,7 @@ type Num struct {
 	val string
 }
 
-func (n *Num) Float64(num float64) string {
+func (n *Num) Float64() string {
 	return n.val
 }
 
@@ -45,12 +45,12 @@ func main() {
 	for {
 		// собираем метрики
 		metrics := collectMetrics(PollCount)
-		if time.Since(lastSendTime) > time.Duration(flagReportInterval) {
+		if time.Since(lastSendTime) > time.Duration(conf.flagReportInterval) {
 			sendMetrics(metrics)
 			lastSendTime = time.Now()
 		}
 
-		time.Sleep(time.Duration(flagRuntime))
+		time.Sleep(time.Duration(conf.flagRuntime))
 		PollCount++
 	}
 }
@@ -78,7 +78,7 @@ func collectRuntimeGauges() map[string]string {
 	gauges["Alloc"] = num.Uint64(memStats.Alloc)
 	gauges["BuckHashSys"] = num.Uint64(memStats.BuckHashSys)
 	gauges["Frees"] = num.Uint64(memStats.Frees)
-	gauges["GCCPUFraction"] = num.Float64(memStats.GCCPUFraction)
+	gauges["GCCPUFraction"] = num.Float64()
 	gauges["GCSys"] = num.Uint64(memStats.GCSys)
 	gauges["HeapAlloc"] = num.Uint64(memStats.HeapAlloc)
 	gauges["HeapIdle"] = num.Uint64(memStats.HeapIdle)
@@ -121,7 +121,7 @@ func sendMetrics(metrics map[string]map[string]string) {
 	//не понимаю, как отправить запрос используя echo, не поднимая сервер
 	for key, types := range metrics {
 		for name, value := range types {
-			url := fmt.Sprintf("http://%s/update/%s/%s/%s", flagRunAddr, key, name, value)
+			url := fmt.Sprintf("http://%s/update/%s/%s/%s", conf.flagRunAddr, key, name, value)
 			post, err := http.Post(
 				url,
 				"text/plain",

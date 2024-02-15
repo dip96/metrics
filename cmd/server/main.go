@@ -167,8 +167,8 @@ func main() {
 	}
 
 	//e.Logger.Fatal()
-	fmt.Println("Running server on", flagRunAddr)
-	err := e.Start(flagRunAddr)
+	fmt.Println("Running server on", conf.flagRunAddr)
+	err := e.Start(conf.flagRunAddr)
 	if err != nil {
 		panic(err)
 	}

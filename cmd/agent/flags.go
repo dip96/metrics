@@ -6,31 +6,32 @@ import (
 	"strconv"
 )
 
-// неэкспортированная переменная flagRunAddr содержит адрес и порт для запуска сервера
-var flagRunAddr string
-var flagReportInterval int
-var flagRuntime int
+type Config struct {
+	flagRunAddr        string
+	flagReportInterval int
+	flagRuntime        int
+}
 
-// parseFlags обрабатывает аргументы командной строки
-// и сохраняет их значения в соответствующих переменных
+var conf Config
+
 func parseFlags() {
-	// регистрируем переменную flagRunAddr
-	// как аргумент -a со значением :8080 по умолчанию
-	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
-	flag.IntVar(&flagReportInterval, "r", 10, "address and port to run server")
-	flag.IntVar(&flagRuntime, "p", 2, "address and port to run server")
-	// парсим переданные серверу аргументы в зарегистрированные переменные
+	conf := Config{}
+
+	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.IntVar(&conf.flagReportInterval, "r", 10, "address and port to run server")
+	flag.IntVar(&conf.flagRuntime, "p", 2, "address and port to run server")
+
 	flag.Parse()
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
-		flagRunAddr = envRunAddr
+		conf.flagRunAddr = envRunAddr
 	}
 
 	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
-		flagReportInterval, _ = strconv.Atoi(envReportInterval)
+		conf.flagReportInterval, _ = strconv.Atoi(envReportInterval)
 	}
 
 	if envRuntime := os.Getenv("RUNTIME"); envRuntime != "" {
-		flagRuntime, _ = strconv.Atoi(envRuntime)
+		conf.flagRuntime, _ = strconv.Atoi(envRuntime)
 	}
 }
