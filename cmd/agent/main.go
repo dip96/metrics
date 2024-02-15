@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"runtime"
@@ -128,14 +129,13 @@ func sendMetrics(metrics map[string]map[string]string) {
 				nil)
 
 			if err != nil {
-				return
+				log.Fatal("Error when sending data:", err)
 			}
 
-			errClose := post.Body.Close()
-			if errClose != nil {
-				return
+			err = post.Body.Close()
+			if err != nil {
+				log.Fatal("Error closing the connection:", err)
 			}
-
 		}
 	}
 }
