@@ -1,1 +1,2 @@
 https://habr.com/ru/companies/vk/articles/463063/ - интерфейсы
+запуск тестов - .\metricstest-windows-amd64.exe --test.v --test.run=^TestIteration2[AB]*$  --source-path=. --agent-binary-path=.\cmd\agent\agent
