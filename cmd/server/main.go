@@ -18,7 +18,7 @@ const (
 
 type Metric struct {
 	Type           MetricType
-	CounterValue   *int
+	CounterValue   *int64
 	GaugeValue     *float64 // Подскажите, а зачем они нужны?
 	fullValueGauge string   //float64 обрезает нули
 }
@@ -33,7 +33,7 @@ type Metrics interface {
 func (m Metric) GetValueForDisplay() (string, error) {
 
 	if m.Type == MetricTypeCounter {
-		return strconv.Itoa(*m.CounterValue), nil
+		return fmt.Sprintf("%d", *m.CounterValue), nil
 	}
 
 	if m.Type == MetricTypeGauge {
@@ -46,7 +46,7 @@ func (m Metric) GetValueForDisplay() (string, error) {
 func (m Metric) GetValue() (string, error) {
 
 	if m.Type == MetricTypeCounter {
-		return strconv.Itoa(*m.CounterValue), nil
+		return fmt.Sprintf("%d", *m.CounterValue), nil
 	}
 
 	if m.Type == MetricTypeGauge {
@@ -111,7 +111,7 @@ func AddMetric(c echo.Context) error {
 			metric.GaugeValue = &value
 			metric.fullValueGauge = valueMetric
 		} else if typeMetric == string(MetricTypeCounter) {
-			value, err := strconv.Atoi(valueMetric)
+			value, err := strconv.ParseInt(valueMetric, 10, 64)
 
 			if err != nil {
 				return c.String(http.StatusBadRequest, "")
