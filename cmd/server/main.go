@@ -2,65 +2,89 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"strconv"
 )
 
+type MetricType string
+
+const (
+	MetricTypeGauge   MetricType = "gauge"
+	MetricTypeCounter MetricType = "counter"
+)
+
+type Metric struct {
+	Type           MetricType
+	CounterValue   *int
+	GaugeValue     *float64 // Подскажите, а зачем они нужны?
+	fullValueGauge string   //float64 обрезает нули
+}
+
+// интерфейс для работы с объектом Metric
+type Metrics interface {
+	GetValueForDisplay() (string, error)
+	GetValue() (string, error)
+	SetValue()
+}
+
+func (m Metric) GetValueForDisplay() (string, error) {
+
+	if m.Type == MetricTypeCounter {
+		return fmt.Sprintf("%d", strconv.Itoa(*m.CounterValue)), nil
+	}
+
+	if m.Type == MetricTypeGauge {
+		return m.fullValueGauge, nil
+	}
+
+	return "", errors.New("The metric was not found")
+}
+
+func (m Metric) GetValue() (string, error) {
+
+	if m.Type == MetricTypeCounter {
+		return strconv.Itoa(*m.CounterValue), nil
+	}
+
+	if m.Type == MetricTypeGauge {
+		return m.fullValueGauge, nil
+	}
+
+	return "", errors.New("The metric was not found")
+}
+
 // Структура для хранения метрик
 type MemStorage struct {
-	metrics map[string]interface{}
+	metrics map[string]Metric
 }
 
-func (m MemStorage) Get(name string) interface{} {
-	return m.metrics[name]
+func (m MemStorage) Get(name string) (Metric, error) {
+	value, ok := m.metrics[name]
+
+	if ok {
+		return value, nil
+	}
+
+	return Metric{}, errors.New("The metric was not found")
 }
 
-func (m MemStorage) Set(name string, metric interface{}) {
+func (m MemStorage) Set(name string, metric Metric) error {
 	m.metrics[name] = metric
+	return nil
 }
 
-func (m MemStorage) GetAll() map[string]interface{} {
-	return m.metrics
+func (m MemStorage) GetAll() (map[string]Metric, error) {
+	return m.metrics, nil
 }
 
 // Интерфейс для работы с хранилищем
 type Storage interface {
-	Get(name string) interface{}
-	Set(name string, metric interface{})
-	GetAll() map[string]interface{}
-}
-
-// Структура метрики Gauge
-type Gauge struct {
-	name      string
-	value     float64
-	fullValue string //float64 обрезает нули
-}
-
-// Метод Set для Gauge
-func (g *Gauge) Set(value float64) {
-	g.value = value
-}
-
-func (g *Gauge) SetFullValue(value string) {
-	g.fullValue = value
-}
-
-func (g *Gauge) GetName() float64 {
-	return g.value
-}
-
-// Структура метрики Counter
-type Counter struct {
-	name  string
-	value int64
-}
-
-// Метод Inc для Counter
-func (c *Counter) Inc(delta int64) {
-	c.value += delta
+	Get(name string) (Metric, error)
+	Set(name string, metric Metric) error
+	GetAll() (map[string]Metric, error)
 }
 
 // Хранилище метрик
@@ -71,80 +95,76 @@ func AddMetric(c echo.Context) error {
 	nameMetric := c.Param("name_metric")
 	valueMetric := c.Param("value_metric")
 
-	var valueMet interface{}
-	if typeMetric == "gauge" {
-		valueInt, err := strconv.ParseFloat(valueMetric, 64)
-		if err != nil {
-			return c.String(http.StatusBadRequest, "")
-		}
-		valueMet = valueInt
-	} else if typeMetric == "counter" {
-		valueInt, err := strconv.ParseInt(valueMetric, 10, 64)
+	metric, err := storage.Get(nameMetric)
 
-		if err != nil {
-			return c.String(http.StatusBadRequest, "")
-		}
-
-		valueMet = valueInt
-	} else {
-		return c.String(http.StatusBadRequest, "")
-	}
-
-	metric := storage.Get(nameMetric)
-
-	switch m := metric.(type) {
-	case *Gauge:
-		m.Set(valueMet.(float64))
-		m.SetFullValue(valueMetric)
-	case *Counter:
-		m.Inc(valueMet.(int64))
-	default:
-		// Создаем метрику, если ее нет
-		if typeMetric == "gauge" {
-			metric = &Gauge{
-				name:      nameMetric,
-				value:     valueMet.(float64),
-				fullValue: valueMetric,
+	if err != nil {
+		//был вариант добавить метод SetValue(29 строка) для логики сохранения в одном месте,
+		//но не понятно, как в него передать все нужные параметры
+		//видимо для этого и необходим  context.Context?
+		if typeMetric == string(MetricTypeGauge) {
+			value, err := strconv.ParseFloat(valueMetric, 64)
+			if err != nil {
+				return c.String(http.StatusBadRequest, "")
 			}
-		} else if typeMetric == "counter" {
-			metric = &Counter{
-				name:  nameMetric,
-				value: valueMet.(int64),
+
+			metric.Type = MetricTypeGauge
+			metric.GaugeValue = &value
+			metric.fullValueGauge = valueMetric
+		} else if typeMetric == string(MetricTypeCounter) {
+			value, err := strconv.Atoi(valueMetric)
+
+			if err != nil {
+				return c.String(http.StatusBadRequest, "")
 			}
+
+			metric.Type = MetricTypeCounter
+			metric.CounterValue = &value
 		} else {
 			return c.String(http.StatusBadRequest, "")
 		}
-		storage.Set(nameMetric, metric)
+
+		err := storage.Set(nameMetric, metric)
+
+		if err != nil {
+			return c.String(http.StatusBadRequest, "")
+		}
 	}
+
 	return c.String(http.StatusOK, "")
 
 }
 
 func getMetric(c echo.Context) error {
 	name := c.Param("name_metric")
-	metric := storage.Get(name)
+	metric, err := storage.Get(name)
 
-	switch m := metric.(type) {
-	case *Gauge:
-		return c.String(http.StatusOK, m.fullValue)
+	value, err := metric.GetValueForDisplay()
 
-	case *Counter:
-		return c.String(http.StatusOK, fmt.Sprintf("%d", m.value))
-
-	default:
-		return c.String(http.StatusNotFound, "")
+	if err != nil {
+		return c.String(http.StatusNotFound, err.Error())
 	}
 
+	return c.String(http.StatusOK, value)
 }
 
 func getAllMetrics(c echo.Context) error {
-	metrics := storage.GetAll()
+	metrics, err := storage.GetAll()
+
+	if err != nil {
+		return err
+	}
 
 	var buf bytes.Buffer
 
 	buf.WriteString("<html><body><ul>")
 
-	for name, value := range metrics {
+	for name, metric := range metrics {
+		value, err := metric.GetValue()
+
+		if err != nil {
+			value = "Not found"
+		}
+
 		buf.WriteString(fmt.Sprintf("<li>%s: %v</li>", name, value))
 	}
 
@@ -163,7 +183,7 @@ func main() {
 	e.GET("/", getAllMetrics)
 
 	storage = &MemStorage{
-		metrics: make(map[string]interface{}),
+		metrics: make(map[string]Metric),
 	}
 
 	//e.Logger.Fatal()

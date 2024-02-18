@@ -131,8 +131,8 @@ func sendMetrics(metrics map[string]map[string]string) {
 				return
 			}
 
-			errClose := post.Body.Close()
-			if errClose != nil {
+			err = post.Body.Close()
+			if err != nil {
 				return
 			}
 		}
