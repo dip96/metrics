@@ -33,14 +33,14 @@ type Metrics interface {
 func (m Metric) GetValueForDisplay() (string, error) {
 
 	if m.Type == MetricTypeCounter {
-		return fmt.Sprintf("%d", strconv.Itoa(*m.CounterValue)), nil
+		return strconv.Itoa(*m.CounterValue), nil
 	}
 
 	if m.Type == MetricTypeGauge {
 		return m.fullValueGauge, nil
 	}
 
-	return "", errors.New("The metric was not found")
+	return "", errors.New("the metric type is incorrect")
 }
 
 func (m Metric) GetValue() (string, error) {
@@ -53,7 +53,7 @@ func (m Metric) GetValue() (string, error) {
 		return m.fullValueGauge, nil
 	}
 
-	return "", errors.New("The metric was not found")
+	return "", errors.New("the metric type is incorrect")
 }
 
 // Структура для хранения метрик
@@ -68,7 +68,7 @@ func (m MemStorage) Get(name string) (Metric, error) {
 		return value, nil
 	}
 
-	return Metric{}, errors.New("The metric was not found")
+	return Metric{}, errors.New("the metric was not found")
 }
 
 func (m MemStorage) Set(name string, metric Metric) error {
@@ -137,6 +137,10 @@ func AddMetric(c echo.Context) error {
 func getMetric(c echo.Context) error {
 	name := c.Param("name_metric")
 	metric, err := storage.Get(name)
+
+	if err != nil {
+		return c.String(http.StatusNotFound, err.Error())
+	}
 
 	value, err := metric.GetValueForDisplay()
 
