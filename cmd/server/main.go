@@ -117,7 +117,11 @@ func AddMetric(c echo.Context) error {
 		}
 
 		metric.Type = MetricTypeCounter
-		metric.CounterValue = &value
+		if metric.CounterValue == nil {
+			metric.CounterValue = &value
+		} else {
+			*metric.CounterValue += value
+		}
 	} else {
 		return c.String(http.StatusBadRequest, "")
 	}
