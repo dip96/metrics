@@ -40,19 +40,28 @@ func main() {
 	//if err != nil {
 	//	panic(err)
 	//}
+	updateInterval := 2 * time.Second
+	sendInterval := 10 * time.Second
 
+	lastUpdateTime := time.Now()
 	lastSendTime := time.Now()
+
 	PollCount := int64(1)
+
+	var metrics = make(map[string]map[string]string)
 	for {
-		// собираем метрики
-		metrics := collectMetrics(PollCount)
-		if time.Since(lastSendTime) > time.Duration(conf.flagReportInterval) {
+		// Обновляем метрики каждые 2 секунды
+		if time.Since(lastUpdateTime) > updateInterval {
+			metrics = collectMetrics(PollCount)
+			PollCount++
+			lastUpdateTime = time.Now()
+		}
+
+		// Отправляем метрики каждые 10 секунд
+		if time.Since(lastSendTime) > sendInterval {
 			sendMetrics(metrics)
 			lastSendTime = time.Now()
 		}
-
-		time.Sleep(time.Duration(conf.flagRuntime))
-		PollCount++
 	}
 }
 

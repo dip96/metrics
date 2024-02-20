@@ -88,50 +88,47 @@ type Storage interface {
 }
 
 // Хранилище метрик
-var storage Storage
+var storage *MemStorage
 
 func AddMetric(c echo.Context) error {
 	typeMetric := c.Param("type_metric")
 	nameMetric := c.Param("name_metric")
 	valueMetric := c.Param("value_metric")
 
-	metric, err := storage.Get(nameMetric)
+	metric, _ := storage.Get(nameMetric)
 
-	if err != nil {
-		//был вариант добавить метод SetValue(29 строка) для логики сохранения в одном месте,
-		//но не понятно, как в него передать все нужные параметры
-		//видимо для этого и необходим  context.Context?
-		if typeMetric == string(MetricTypeGauge) {
-			value, err := strconv.ParseFloat(valueMetric, 64)
-			if err != nil {
-				return c.String(http.StatusBadRequest, "")
-			}
-
-			metric.Type = MetricTypeGauge
-			metric.GaugeValue = &value
-			metric.fullValueGauge = valueMetric
-		} else if typeMetric == string(MetricTypeCounter) {
-			value, err := strconv.ParseInt(valueMetric, 10, 64)
-
-			if err != nil {
-				return c.String(http.StatusBadRequest, "")
-			}
-
-			metric.Type = MetricTypeCounter
-			metric.CounterValue = &value
-		} else {
+	//был вариант добавить метод SetValue(29 строка) для логики сохранения в одном месте,
+	//но не понятно, как в него передать все нужные параметры
+	//видимо для этого и необходим  context.Context?
+	if typeMetric == string(MetricTypeGauge) {
+		value, err := strconv.ParseFloat(valueMetric, 64)
+		if err != nil {
 			return c.String(http.StatusBadRequest, "")
 		}
 
-		err := storage.Set(nameMetric, metric)
+		metric.Type = MetricTypeGauge
+		metric.GaugeValue = &value
+		metric.fullValueGauge = valueMetric
+	} else if typeMetric == string(MetricTypeCounter) {
+		value, err := strconv.ParseInt(valueMetric, 10, 64)
 
 		if err != nil {
 			return c.String(http.StatusBadRequest, "")
 		}
+
+		metric.Type = MetricTypeCounter
+		metric.CounterValue = &value
+	} else {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	err := storage.Set(nameMetric, metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
 	}
 
 	return c.String(http.StatusOK, "")
-
 }
 
 func getMetric(c echo.Context) error {
@@ -190,7 +187,6 @@ func main() {
 		metrics: make(map[string]Metric),
 	}
 
-	//e.Logger.Fatal()
 	fmt.Println("Running server on", conf.flagRunAddr)
 	err := e.Start(conf.flagRunAddr)
 	if err != nil {
