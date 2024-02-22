@@ -22,9 +22,9 @@ func NewConfig() *Config {
 		conf.flagRunAddr = envRunAddr
 	}
 
-	if envRunAddr := os.Getenv("PATH_FOR_FILE_LOGS"); envRunAddr != "" {
-		conf.flagRunAddr = envRunAddr
-	}
+	//if envRunAddr := os.Getenv("PATH_FOR_FILE_LOGS"); envRunAddr != "" {
+	//	conf.flagRunAddr = envRunAddr
+	//}
 
 	return conf
 }
