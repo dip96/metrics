@@ -32,7 +32,7 @@ func NewConfig() *Config {
 }
 
 func parseFlags() {
-	flag.StringVar(&conf.flagRunAddr, "a", "127.0.0.1:8080", "address and port to run server")
+	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
 	//TODO изменить на программное получение абсолютного пути к корневой директории проекта
 	flag.StringVar(&conf.pathForLogs, "a", "/home/dip96/go_project/metrics/requests.log", "address and port to run server")
 
