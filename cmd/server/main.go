@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/dip96/metrics/internal/middleware"
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"strconv"
@@ -179,9 +180,13 @@ func getAllMetrics(c echo.Context) error {
 }
 
 func main() {
-	parseFlags()
+	conf := NewConfig()
 
+	middleware.InitLogger()
+	defer middleware.CloseLogger()
 	e := echo.New()
+
+	e.Use(middleware.Logger)
 
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)
 	e.GET("/value/:type_metric/:name_metric", getMetric)
