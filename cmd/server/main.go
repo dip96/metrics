@@ -180,7 +180,7 @@ func getAllMetrics(c echo.Context) error {
 }
 
 func main() {
-	conf := NewConfig()
+	parseFlags()
 
 	middleware.InitLogger()
 	defer middleware.CloseLogger()

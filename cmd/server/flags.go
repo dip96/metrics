@@ -10,6 +10,8 @@ type Config struct {
 	pathForLogs string
 }
 
+var conf Config
+
 func NewConfig() *Config {
 	conf := &Config{}
 	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
@@ -27,4 +29,16 @@ func NewConfig() *Config {
 	//}
 
 	return conf
+}
+
+func parseFlags() {
+	flag.StringVar(&conf.flagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
+	//TODO изменить на программное получение абсолютного пути к корневой директории проекта
+	flag.StringVar(&conf.pathForLogs, "a", "/home/dip96/go_project/metrics/requests.log", "address and port to run server")
+
+	flag.Parse()
+
+	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
+		conf.flagRunAddr = envRunAddr
+	}
 }
