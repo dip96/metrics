@@ -1,4 +1,6 @@
 cd cmd/server
+rm -rf server
 go build -o server *.go
 cd ../agent
-go build -o agent *.go &
+rm -rf agent
+go build -o agent *.go

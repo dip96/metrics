@@ -1,9 +1,8 @@
-// TODO не до конца понимаю, как реализовать условия из "Важно"
-// TODO переделать ассоциативный масссив на  map[string]interface{}???
-
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -12,34 +11,23 @@ import (
 	"time"
 )
 
-type Num struct {
-	val string
-}
+type MetricType string
 
-func (n *Num) Float64() string {
-	return n.val
-}
+const (
+	MetricTypeGauge   MetricType = "gauge"
+	MetricTypeCounter MetricType = "counter"
+)
 
-func (n *Num) Uint64(num uint64) string {
-	n.val = fmt.Sprint(float64(num))
-	return n.val
-}
-
-func (n *Num) Uint32(num uint32) string {
-	n.val = fmt.Sprint(float64(num))
-	return n.val
+type Metrics struct {
+	ID    string   `json:"id"`              // имя метрики
+	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
+	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
+	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
 }
 
 func main() {
 	parseFlags()
 
-	//не до конца понимаю, как можно связать с http cервером
-	//e := echo.New()
-	//
-	//err := e.Start(flagRunAddr)
-	//if err != nil {
-	//	panic(err)
-	//}
 	updateInterval := 2 * time.Second
 	sendInterval := 10 * time.Second
 
@@ -48,7 +36,7 @@ func main() {
 
 	PollCount := int64(1)
 
-	var metrics = make(map[string]map[string]string)
+	var metrics []Metrics
 	for {
 		// Обновляем метрики каждые 2 секунды
 		if time.Since(lastUpdateTime) > updateInterval {
@@ -65,86 +53,121 @@ func main() {
 	}
 }
 
-func collectMetrics(PollCount int64) map[string]map[string]string {
-	var metrics = make(map[string]map[string]string)
+func collectMetrics(PollCount int64) []Metrics {
+	var metrics []Metrics
 
 	// метрики gauge
-	metrics["gauge"] = collectRuntimeGauges()
+	metrics = collectRuntimeGauges()
 
 	// счетчик PollCount
-	metrics["counter"] = collectPollCount(PollCount)
+	metrics = append(metrics, collectPollCount(PollCount)...)
 
 	return metrics
 }
 
-func collectRuntimeGauges() map[string]string {
-	//ассоциативный массив
-	var gauges = make(map[string]string)
+func collectRuntimeGauges() []Metrics {
+	var gauges []Metrics
 
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
 
-	num := &Num{}
-	gauges["Alloc"] = num.Uint64(memStats.Alloc)
-	gauges["BuckHashSys"] = num.Uint64(memStats.BuckHashSys)
-	gauges["Frees"] = num.Uint64(memStats.Frees)
-	gauges["GCCPUFraction"] = num.Float64()
-	gauges["GCSys"] = num.Uint64(memStats.GCSys)
-	gauges["HeapAlloc"] = num.Uint64(memStats.HeapAlloc)
-	gauges["HeapIdle"] = num.Uint64(memStats.HeapIdle)
-	gauges["HeapInuse"] = num.Uint64(memStats.HeapInuse)
-	gauges["HeapObjects"] = num.Uint64(memStats.HeapObjects)
-	gauges["HeapReleased"] = num.Uint64(memStats.HeapReleased)
-	gauges["HeapSys"] = num.Uint64(memStats.HeapSys)
-	gauges["LastGC"] = num.Uint64(memStats.LastGC)
-	gauges["Lookups"] = num.Uint64(memStats.Lookups)
-	gauges["MCacheInuse"] = num.Uint64(memStats.MCacheInuse)
-	gauges["MCacheSys"] = num.Uint64(memStats.MCacheSys)
-	gauges["Mallocs"] = num.Uint64(memStats.Mallocs)
-	gauges["NextGC"] = num.Uint64(memStats.NextGC)
-	gauges["NumForcedGC"] = num.Uint32(memStats.NumForcedGC)
-	gauges["NumGC"] = num.Uint32(memStats.NumGC)
-	gauges["OtherSys"] = num.Uint64(memStats.OtherSys)
-	gauges["PauseTotalNs"] = num.Uint64(memStats.PauseTotalNs)
-	gauges["StackInuse"] = num.Uint64(memStats.StackInuse)
-	gauges["StackSys"] = num.Uint64(memStats.StackSys)
-	gauges["Sys"] = num.Uint64(memStats.Sys)
-	gauges["TotalAlloc"] = num.Uint64(memStats.TotalAlloc)
-
-	// случайное значение
-	gauges["RandomValue"] = collectRandomValue()
+	gauges = append(gauges, createMetricFromUint64("Alloc", string(MetricTypeGauge), memStats.Alloc))
+	gauges = append(gauges, createMetricFromUint64("BuckHashSys", string(MetricTypeGauge), memStats.BuckHashSys))
+	gauges = append(gauges, createMetricFromUint64("Frees", string(MetricTypeGauge), memStats.Frees))
+	gauges = append(gauges, createMetricFromFloat64("GCCPUFraction", string(MetricTypeGauge), memStats.GCCPUFraction))
+	gauges = append(gauges, createMetricFromUint64("GCSys", string(MetricTypeGauge), memStats.GCSys))
+	gauges = append(gauges, createMetricFromUint64("HeapAlloc", string(MetricTypeGauge), memStats.HeapAlloc))
+	gauges = append(gauges, createMetricFromUint64("HeapIdle", string(MetricTypeGauge), memStats.HeapIdle))
+	gauges = append(gauges, createMetricFromUint64("HeapInuse", string(MetricTypeGauge), memStats.HeapInuse))
+	gauges = append(gauges, createMetricFromUint64("HeapObjects", string(MetricTypeGauge), memStats.HeapObjects))
+	gauges = append(gauges, createMetricFromUint64("HeapReleased", string(MetricTypeGauge), memStats.HeapReleased))
+	gauges = append(gauges, createMetricFromUint64("HeapSys", string(MetricTypeGauge), memStats.HeapSys))
+	gauges = append(gauges, createMetricFromUint64("LastGC", string(MetricTypeGauge), memStats.LastGC))
+	gauges = append(gauges, createMetricFromUint64("Lookups", string(MetricTypeGauge), memStats.Lookups))
+	gauges = append(gauges, createMetricFromUint64("MCacheInuse", string(MetricTypeGauge), memStats.MCacheInuse))
+	gauges = append(gauges, createMetricFromUint64("Lookups", string(MetricTypeGauge), memStats.Lookups))
+	gauges = append(gauges, createMetricFromUint64("MCacheSys", string(MetricTypeGauge), memStats.MCacheSys))
+	gauges = append(gauges, createMetricFromUint64("Mallocs", string(MetricTypeGauge), memStats.Mallocs))
+	gauges = append(gauges, createMetricFromUint64("NextGC", string(MetricTypeGauge), memStats.NextGC))
+	gauges = append(gauges, createMetricFromUint32("NumForcedGC", string(MetricTypeGauge), memStats.NumForcedGC))
+	gauges = append(gauges, createMetricFromUint32("NumGC", string(MetricTypeGauge), memStats.NumGC))
+	gauges = append(gauges, createMetricFromUint64("OtherSys", string(MetricTypeGauge), memStats.OtherSys))
+	gauges = append(gauges, createMetricFromUint64("PauseTotalNs", string(MetricTypeGauge), memStats.PauseTotalNs))
+	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.StackInuse))
+	gauges = append(gauges, createMetricFromUint64("StackSys", string(MetricTypeGauge), memStats.StackSys))
+	gauges = append(gauges, createMetricFromUint64("Sys", string(MetricTypeGauge), memStats.Sys))
+	gauges = append(gauges, createMetricFromUint64("TotalAlloc", string(MetricTypeGauge), memStats.TotalAlloc))
+	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.StackInuse))
+	gauges = append(gauges, createMetricFromFloat64("RandomValue", string(MetricTypeGauge), collectRandomValue()))
 
 	return gauges
 }
 
-func collectPollCount(PollCount int64) map[string]string {
-	var counter = make(map[string]string)
-	counter["PollCount"] = fmt.Sprint(PollCount)
+func collectPollCount(PollCount int64) []Metrics {
+	var counter []Metrics
+	counter = append(counter, createMetricFromInt64("PollCount", string(MetricTypeCounter), PollCount))
 	return counter
 }
 
-func collectRandomValue() string {
-	return fmt.Sprint(rand.Float64())
+func collectRandomValue() float64 {
+	return rand.Float64()
 }
 
-func sendMetrics(metrics map[string]map[string]string) {
-	//не понимаю, как отправить запрос используя echo, не поднимая сервер
-	for key, types := range metrics {
-		for name, value := range types {
-			url := fmt.Sprintf("http://%s/update/%s/%s/%s", conf.flagRunAddr, key, name, value)
-			post, err := http.Post(
-				url,
-				"text/plain",
-				nil)
+func sendMetrics(metrics []Metrics) {
+	for _, metric := range metrics {
+		data, err := json.Marshal(metric)
 
-			if err != nil {
-				log.Fatal("Error when sending data:", err)
-			}
+		if err != nil {
+			log.Fatal("Error when serialization object:", err)
+		}
 
-			err = post.Body.Close()
-			if err != nil {
-				log.Fatal("Error closing the connection:", err)
-			}
+		url := fmt.Sprintf("http://%s/update/", conf.flagRunAddr)
+		post, err := http.Post(
+			url,
+			"application/json",
+			bytes.NewBuffer(data))
+
+		if err != nil {
+			log.Fatal("Error when sending data:", err)
+		}
+
+		err = post.Body.Close()
+		if err != nil {
+			log.Fatal("Error closing the connection:", err)
 		}
 	}
+}
+
+func createMetricFromFloat64(name string, typeMetric string, value float64) Metrics {
+	var metric Metrics
+	metric.ID = name
+	metric.MType = typeMetric
+	metric.Value = &value
+	return metric
+}
+
+func createMetricFromUint64(name string, typeMetric string, value uint64) Metrics {
+	var metric Metrics
+	metric.ID = name
+	metric.MType = typeMetric
+	floatValue := float64(value)
+	metric.Value = &floatValue
+	return metric
+}
+
+func createMetricFromInt64(name string, typeMetric string, value int64) Metrics {
+	var metric Metrics
+	metric.ID = name
+	metric.MType = typeMetric
+	metric.Delta = &value
+	return metric
+}
+
+func createMetricFromUint32(name string, typeMetric string, value uint32) Metrics {
+	var metric Metrics
+	metric.ID = name
+	metric.MType = typeMetric
+	floatValue := float64(value)
+	metric.Value = &floatValue
+	return metric
 }
