@@ -10,6 +10,8 @@ func Logger(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		start := time.Now()
 
+		log.Printf("START")
+
 		err := next(c)
 		duration := time.Since(start)
 		log.Printf("Запрос: %s %s, время - %s", c.Request().URL.Path, c.Request().Method, duration)
