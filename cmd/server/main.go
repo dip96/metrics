@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/dip96/metrics/internal/middleware"
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //type RequestBody struct {
@@ -188,6 +191,9 @@ func AddMetricV2(c echo.Context) error {
 	nameMetric := body.ID
 	metric, _ := storage.Get(nameMetric)
 	metric.ID = body.ID
+
+	jsonBytes, _ := json.Marshal(body)
+	log.Printf(string(jsonBytes))
 
 	if typeMetric == MetricTypeGauge {
 		valueMetric := body.Value
