@@ -222,14 +222,16 @@ func AddMetricV2(c echo.Context) error {
 }
 
 func GetMetricV2(c echo.Context) error {
+	log.Printf("START  GetMetricV2 ")
 	body := new(Metric)
 
 	if err := c.Bind(body); err != nil {
+		log.Printf("START  GetMetricV2 " + err.Error())
 		return err
 	}
 
 	jsonBytes, _ := json.Marshal(body)
-	log.Printf(string(jsonBytes))
+	log.Printf("LOG - " + string(jsonBytes))
 
 	nameMetric := body.ID
 	metric, err := storage.Get(nameMetric)
