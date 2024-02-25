@@ -46,8 +46,8 @@ func (m Metric) GetValueForDisplay() (string, error) {
 	}
 
 	if m.MType == MetricTypeGauge {
-		return fmt.Sprintf("%f", *m.Value), nil
-		//return m.fullValueGauge, nil
+		//return fmt.Sprintf("%f", *m.Value), nil
+		return m.fullValueGauge, nil
 	}
 
 	return "", errors.New("the metric type is incorrect")
