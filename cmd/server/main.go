@@ -99,9 +99,6 @@ func AddMetric(c echo.Context) error {
 
 	metric, _ := storage.Get(nameMetric)
 
-	//был вариант добавить метод SetValue(29 строка) для логики сохранения в одном месте,
-	//но не понятно, как в него передать все нужные параметры
-	//видимо для этого и необходим  context.Context?
 	if typeMetric == string(MetricTypeGauge) {
 		value, err := strconv.ParseFloat(valueMetric, 64)
 		if err != nil {
@@ -235,8 +232,8 @@ func GetMetricV2(c echo.Context) error {
 }
 
 func main() {
-	conf := NewConfig()
-
+	//conf := NewConfig()
+	parseFlags()
 	middleware.InitLogger()
 	defer middleware.CloseLogger()
 	e := echo.New()
