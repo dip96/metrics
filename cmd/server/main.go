@@ -227,6 +227,10 @@ func GetMetricV2(c echo.Context) error {
 	if err := c.Bind(body); err != nil {
 		return err
 	}
+
+	jsonBytes, _ := json.Marshal(body)
+	log.Printf(string(jsonBytes))
+
 	nameMetric := body.ID
 	metric, err := storage.Get(nameMetric)
 
