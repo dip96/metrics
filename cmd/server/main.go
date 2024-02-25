@@ -234,8 +234,8 @@ func GetMetricV2(c echo.Context) error {
 func main() {
 	//conf := NewConfig()
 	parseFlags()
-	middleware.InitLogger()
-	defer middleware.CloseLogger()
+	//middleware.InitLogger()
+	//defer middleware.CloseLogger()
 	e := echo.New()
 
 	e.Use(middleware.Logger)
