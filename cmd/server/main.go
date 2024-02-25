@@ -2,12 +2,23 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dip96/metrics/internal/middleware"
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
 )
+
+//type RequestBody struct {
+//	ID    string   `json:"id"`              // имя метрики
+//	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
+//	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
+//	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
+//}
 
 type MetricType string
 
@@ -17,26 +28,28 @@ const (
 )
 
 type Metric struct {
-	Type           MetricType
-	CounterValue   *int64
-	GaugeValue     *float64 // Подскажите, а зачем они нужны?
-	fullValueGauge string   //float64 обрезает нули
+	ID             string     `json:"id"`              // имя метрики
+	MType          MetricType `json:"type"`            // параметр, принимающий значение gauge или counter
+	Delta          *int64     `json:"delta,omitempty"` // значение метрики в случае передачи counter
+	Value          *float64   `json:"value,omitempty"` // значение метрики в случае передачи gauge
+	fullValueGauge string     //float64 обрезает нули
 }
 
-// интерфейс для работы с объектом Metric
-type Metrics interface {
-	GetValueForDisplay() (string, error)
-	GetValue() (string, error)
-	SetValue()
-}
+//type Metric struct {
+//	ID             string
+//	Type           MetricType
+//	CounterValue   *int64
+//	GaugeValue     *float64
+//	fullValueGauge string //float64 обрезает нули
+//}
 
 func (m Metric) GetValueForDisplay() (string, error) {
-
-	if m.Type == MetricTypeCounter {
-		return fmt.Sprintf("%d", *m.CounterValue), nil
+	if m.MType == MetricTypeCounter {
+		return fmt.Sprintf("%d", *m.Delta), nil
 	}
 
-	if m.Type == MetricTypeGauge {
+	if m.MType == MetricTypeGauge {
+		//return fmt.Sprintf("%f", *m.Value), nil
 		return m.fullValueGauge, nil
 	}
 
@@ -44,13 +57,12 @@ func (m Metric) GetValueForDisplay() (string, error) {
 }
 
 func (m Metric) GetValue() (string, error) {
-
-	if m.Type == MetricTypeCounter {
-		return fmt.Sprintf("%d", *m.CounterValue), nil
+	if m.MType == MetricTypeCounter {
+		return fmt.Sprintf("%d", *m.Delta), nil
 	}
 
-	if m.Type == MetricTypeGauge {
-		return m.fullValueGauge, nil
+	if m.MType == MetricTypeGauge {
+		return fmt.Sprintf("%f", *m.Value), nil
 	}
 
 	return "", errors.New("the metric type is incorrect")
@@ -80,13 +92,6 @@ func (m MemStorage) GetAll() (map[string]Metric, error) {
 	return m.metrics, nil
 }
 
-// Интерфейс для работы с хранилищем
-type Storage interface {
-	Get(name string) (Metric, error)
-	Set(name string, metric Metric) error
-	GetAll() (map[string]Metric, error)
-}
-
 // Хранилище метрик
 var storage *MemStorage
 
@@ -97,17 +102,14 @@ func AddMetric(c echo.Context) error {
 
 	metric, _ := storage.Get(nameMetric)
 
-	//был вариант добавить метод SetValue(29 строка) для логики сохранения в одном месте,
-	//но не понятно, как в него передать все нужные параметры
-	//видимо для этого и необходим  context.Context?
 	if typeMetric == string(MetricTypeGauge) {
 		value, err := strconv.ParseFloat(valueMetric, 64)
 		if err != nil {
 			return c.String(http.StatusBadRequest, "")
 		}
 
-		metric.Type = MetricTypeGauge
-		metric.GaugeValue = &value
+		metric.MType = MetricTypeGauge
+		metric.Value = &value
 		metric.fullValueGauge = valueMetric
 	} else if typeMetric == string(MetricTypeCounter) {
 		value, err := strconv.ParseInt(valueMetric, 10, 64)
@@ -116,11 +118,11 @@ func AddMetric(c echo.Context) error {
 			return c.String(http.StatusBadRequest, "")
 		}
 
-		metric.Type = MetricTypeCounter
-		if metric.CounterValue == nil {
-			metric.CounterValue = &value
+		metric.MType = MetricTypeCounter
+		if metric.Delta == nil {
+			metric.Delta = &value
 		} else {
-			*metric.CounterValue += value
+			*metric.Delta += value
 		}
 	} else {
 		return c.String(http.StatusBadRequest, "")
@@ -178,14 +180,85 @@ func getAllMetrics(c echo.Context) error {
 	return c.HTML(http.StatusOK, buf.String())
 }
 
-func main() {
-	parseFlags()
+func AddMetricV2(c echo.Context) error {
+	body := new(Metric)
 
+	if err := c.Bind(body); err != nil {
+		return err
+	}
+
+	typeMetric := body.MType
+	nameMetric := body.ID
+	metric, _ := storage.Get(nameMetric)
+	metric.ID = body.ID
+
+	jsonBytes, _ := json.Marshal(body)
+	log.Printf(string(jsonBytes))
+
+	if typeMetric == MetricTypeGauge {
+		valueMetric := body.Value
+		metric.MType = MetricTypeGauge
+		metric.Value = valueMetric
+		metric.fullValueGauge = fmt.Sprintf("%f", *valueMetric)
+	} else if typeMetric == MetricTypeCounter {
+		valueMetric := body.Delta
+		if metric.Delta == nil {
+			metric.MType = MetricTypeCounter
+			metric.Delta = valueMetric
+		} else {
+			*metric.Delta += *valueMetric
+		}
+	} else {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	err := storage.Set(nameMetric, metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	return c.JSON(http.StatusOK, metric)
+}
+
+func GetMetricV2(c echo.Context) error {
+	log.Printf("START  GetMetricV2 ")
+	body := new(Metric)
+
+	if err := c.Bind(body); err != nil {
+		log.Printf("START  GetMetricV2 " + err.Error())
+		return err
+	}
+
+	jsonBytes, _ := json.Marshal(body)
+	log.Printf("LOG - " + string(jsonBytes))
+
+	nameMetric := body.ID
+	metric, err := storage.Get(nameMetric)
+
+	if err != nil {
+		return c.String(http.StatusNotFound, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, metric)
+}
+
+func main() {
+	//conf := NewConfig()
+	parseFlags()
+	//middleware.InitLogger()
+	//defer middleware.CloseLogger()
 	e := echo.New()
 
+	e.Use(middleware.Logger)
+
+	//TODO нужно ли удалять два нижних роута?
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)
 	e.GET("/value/:type_metric/:name_metric", getMetric)
 	e.GET("/", getAllMetrics)
+
+	e.POST("/update/", AddMetricV2)
+	e.POST("/value/", GetMetricV2)
 
 	storage = &MemStorage{
 		metrics: make(map[string]Metric),
