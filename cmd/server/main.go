@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"github.com/dip96/metrics/internal/middleware"
 	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"net/http"
 	"strconv"
-
-	log "github.com/sirupsen/logrus"
 )
 
 //type RequestBody struct {
@@ -192,9 +191,6 @@ func AddMetricV2(c echo.Context) error {
 	metric, _ := storage.Get(nameMetric)
 	metric.ID = body.ID
 
-	jsonBytes, _ := json.Marshal(body)
-	log.Printf(string(jsonBytes))
-
 	if typeMetric == MetricTypeGauge {
 		valueMetric := body.Value
 		metric.MType = MetricTypeGauge
@@ -218,20 +214,21 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	return c.JSON(http.StatusOK, metric)
+	jsonData, err := json.Marshal(metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	return c.JSONBlob(http.StatusOK, jsonData)
 }
 
 func GetMetricV2(c echo.Context) error {
-	log.Printf("START  GetMetricV2 ")
 	body := new(Metric)
 
 	if err := c.Bind(body); err != nil {
-		log.Printf("START  GetMetricV2 " + err.Error())
 		return err
 	}
-
-	jsonBytes, _ := json.Marshal(body)
-	log.Printf("LOG - " + string(jsonBytes))
 
 	nameMetric := body.ID
 	metric, err := storage.Get(nameMetric)
@@ -251,6 +248,8 @@ func main() {
 	e := echo.New()
 
 	e.Use(middleware.Logger)
+	e.Use(middleware.UnzipMiddleware)
+	e.Use(echoMiddleware.Gzip())
 
 	//TODO нужно ли удалять два нижних роута?
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)

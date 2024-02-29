@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/dip96/metrics/internal/utils"
 	"log"
 	"math/rand"
 	"net/http"
@@ -122,16 +123,29 @@ func sendMetrics(metrics []Metrics) {
 		}
 
 		url := fmt.Sprintf("http://%s/update/", conf.flagRunAddr)
-		post, err := http.Post(
-			url,
-			"application/json",
-			bytes.NewBuffer(data))
+		b, err := utils.GzipCompress(data)
 
 		if err != nil {
-			log.Fatal("Error when sending data:", err)
+			log.Fatal("Error when compress data:", err.Error())
 		}
 
-		err = post.Body.Close()
+		fmt.Printf("%d bytes has been compressed to %d bytes\r\n", len(data), len(b))
+
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+		if err != nil {
+			log.Fatal("Error when created request data:", err.Error())
+		}
+
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Content-Encoding", "gzip")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatal("Error when sending data:", err.Error())
+		}
+
+		err = resp.Body.Close()
 		if err != nil {
 			log.Fatal("Error closing the connection:", err)
 		}

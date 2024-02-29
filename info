@@ -1,3 +1,3 @@
 https://habr.com/ru/companies/vk/articles/463063/ - интерфейсы
 запуск тестов:
-./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=.
+./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
