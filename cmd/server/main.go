@@ -8,7 +8,6 @@ import (
 	"github.com/dip96/metrics/internal/middleware"
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
-	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -215,7 +214,7 @@ func AddMetricV2(c echo.Context) error {
 			log.Fatal("Error when compress data:", err.Error())
 		}
 
-		fmt.Printf("%d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
+		fmt.Printf("123 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
 	}
 
@@ -248,11 +247,6 @@ func GetMetricV2(c echo.Context) error {
 func main() {
 	parseFlags()
 	e := echo.New()
-	e.Use(echoMiddleware.GzipWithConfig(echoMiddleware.GzipConfig{
-		Skipper:   nil,
-		MinLength: 0,
-	}))
-
 	e.Use(middleware.Logger)
 	e.Use(middleware.UnzipMiddleware)
 	//e.Use(echoMiddleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {

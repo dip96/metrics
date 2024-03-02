@@ -29,8 +29,8 @@ type Metrics struct {
 func main() {
 	parseFlags()
 
-	updateInterval := 2 * time.Second
-	sendInterval := 10 * time.Second
+	updateInterval := time.Duration(conf.flagRuntime) * time.Second
+	sendInterval := time.Duration(conf.flagReportInterval) * time.Second
 
 	lastUpdateTime := time.Now()
 	lastSendTime := time.Now()
@@ -128,8 +128,6 @@ func sendMetrics(metrics []Metrics) {
 		if err != nil {
 			log.Fatal("Error when compress data:", err.Error())
 		}
-
-		fmt.Printf("%d bytes has been compressed to %d bytes\r\n", len(data), len(b))
 
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 		if err != nil {
