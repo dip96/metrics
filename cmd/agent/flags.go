@@ -17,8 +17,8 @@ var conf Config
 func parseFlags() {
 	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
 	//flag.StringVar(&conf.flagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-	flag.IntVar(&conf.flagReportInterval, "r", 0, "address and port to run server")
-	flag.IntVar(&conf.flagRuntime, "p", 0, "address and port to run server")
+	flag.IntVar(&conf.flagReportInterval, "r", 1, "address and port to run server")
+	flag.IntVar(&conf.flagRuntime, "p", 1, "address and port to run server")
 
 	flag.Parse()
 
