@@ -10,8 +10,6 @@ func Logger(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		start := time.Now()
 
-		log.Printf("START")
-
 		err := next(c)
 
 		if err != nil {

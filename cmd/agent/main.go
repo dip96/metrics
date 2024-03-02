@@ -99,6 +99,8 @@ func collectRuntimeGauges() []Metrics {
 	gauges = append(gauges, createMetricFromUint64("Sys", string(MetricTypeGauge), memStats.Sys))
 	gauges = append(gauges, createMetricFromUint64("TotalAlloc", string(MetricTypeGauge), memStats.TotalAlloc))
 	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.StackInuse))
+	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.MSpanInuse))
+	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.MSpanSys))
 	gauges = append(gauges, createMetricFromFloat64("RandomValue", string(MetricTypeGauge), collectRandomValue()))
 
 	return gauges
