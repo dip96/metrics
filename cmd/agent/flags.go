@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -25,11 +26,11 @@ func parseFlags() {
 		conf.flagRunAddr = envRunAddr
 	}
 
-	//if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
-	//	conf.flagReportInterval, _ = strconv.Atoi(envReportInterval)
-	//}
-	//
-	//if envRuntime := os.Getenv("RUNTIME"); envRuntime != "" {
-	//	conf.flagRuntime, _ = strconv.Atoi(envRuntime)
-	//}
+	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
+		conf.flagReportInterval, _ = strconv.Atoi(envReportInterval)
+	}
+
+	if envRuntime := os.Getenv("RUNTIME"); envRuntime != "" {
+		conf.flagRuntime, _ = strconv.Atoi(envRuntime)
+	}
 }
