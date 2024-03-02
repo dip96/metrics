@@ -1,26 +1,30 @@
 package middleware
 
 import (
+	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
-	"os"
+	"time"
 )
 
-var logFile *os.File
+func Logger(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		start := time.Now()
 
-func InitLogger() {
-	//TODO найти способ получить из конфигов значение - pathForLogs
-	file, err := os.OpenFile("/home/dip96/go_project/metrics/requests.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
+		log.Printf("START")
 
-	log.SetOutput(file)
-	//log.SetFormatter(&log.JSONFormatter{})
-	log.SetLevel(log.InfoLevel)
-}
+		err := next(c)
 
-func CloseLogger() {
-	if logFile != nil {
-		logFile.Close()
+		if err != nil {
+			log.Errorf("Ошибка - %s", err.Error())
+		}
+
+		duration := time.Since(start)
+		log.Printf("Запрос: %s %s, время - %s", c.Request().URL.Path, c.Request().Method, duration)
+
+		statusCode := c.Response().Status
+		responseSize := c.Response().Size
+		log.Printf("Ответ: статус код - %d. Размер - %d", statusCode, responseSize)
+
+		return err
 	}
 }

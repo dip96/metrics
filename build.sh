@@ -1,4 +1,4 @@
-cd cmd/server
+cd ./cmd/server
 rm -rf server
 go build -o server *.go
 cd ../agent

@@ -6,18 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dip96/metrics/internal/middleware"
+	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 )
-
-//type RequestBody struct {
-//	ID    string   `json:"id"`              // имя метрики
-//	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-//	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-//	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-//}
 
 type MetricType string
 
@@ -34,21 +29,12 @@ type Metric struct {
 	fullValueGauge string     //float64 обрезает нули
 }
 
-//type Metric struct {
-//	ID             string
-//	Type           MetricType
-//	CounterValue   *int64
-//	GaugeValue     *float64
-//	fullValueGauge string //float64 обрезает нули
-//}
-
 func (m Metric) GetValueForDisplay() (string, error) {
 	if m.MType == MetricTypeCounter {
 		return fmt.Sprintf("%d", *m.Delta), nil
 	}
 
 	if m.MType == MetricTypeGauge {
-		//return fmt.Sprintf("%f", *m.Value), nil
 		return m.fullValueGauge, nil
 	}
 
@@ -220,6 +206,19 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
+	//не получилось перезаписать данные в body используя middleware
+	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	if acceptEncoding == "gzip" {
+		b, err := utils.GzipCompress(jsonData)
+
+		if err != nil {
+			log.Fatal("Error when compress data:", err.Error())
+		}
+
+		fmt.Printf("%d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
+		c.Response().Header().Set("Content-Encoding", "gzip")
+	}
+
 	return c.JSONBlob(http.StatusOK, jsonData)
 }
 
@@ -237,19 +236,39 @@ func GetMetricV2(c echo.Context) error {
 		return c.String(http.StatusNotFound, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, metric)
+	jsonData, err := json.Marshal(metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	return c.JSONBlob(http.StatusOK, jsonData)
 }
 
 func main() {
-	//conf := NewConfig()
 	parseFlags()
-	//middleware.InitLogger()
-	//defer middleware.CloseLogger()
 	e := echo.New()
+	e.Use(echoMiddleware.GzipWithConfig(echoMiddleware.GzipConfig{
+		Skipper:   nil,
+		MinLength: 0,
+	}))
 
 	e.Use(middleware.Logger)
 	e.Use(middleware.UnzipMiddleware)
-	e.Use(echoMiddleware.Gzip())
+	//e.Use(echoMiddleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
+	//	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	//	if acceptEncoding == "gzip" {
+	//		b, err := utils.GzipCompress(resBody)
+	//
+	//		if err != nil {
+	//			log.Fatal("Error when compress data:", err.Error())
+	//		}
+	//
+	//		fmt.Printf("%d bytes has been compressed to bytes\r\n", len(b))
+	//	}
+	//	c.Response().Header().Set("Content-Encoding", "gzip")
+	//}))
+	//e.Use(echoMiddleware.Gzip())// не работает по какой-то причине
 
 	//TODO нужно ли удалять два нижних роута?
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)

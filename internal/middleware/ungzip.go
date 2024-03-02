@@ -18,24 +18,6 @@ func UnzipMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 		err := next(c)
 
-		//if err := next(c); err != nil {
-		//	return err
-		//}
-
-		//ae := c.Request().Header.Get("Accept-Encoding")
-
-		//if ae == "gzip" {
-		//	//_ := c.Response()
-		//	//rw := response.Writer()
-		//	//body, err := io.ReadAll(rw.Body)
-		//	//if err != nil {
-		//	//	return err
-		//	//}
-		//}
-
-		c.Response().Header().Set("Content-Encoding", "gzip")
-		c.Response().Header().Set("Accept-Encoding", "gzip")
-
 		return err
 	}
 }
