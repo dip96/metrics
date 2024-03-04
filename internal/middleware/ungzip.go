@@ -3,6 +3,7 @@ package middleware
 import (
 	"compress/gzip"
 	"github.com/labstack/echo/v4"
+	log "github.com/sirupsen/logrus"
 )
 
 func UnzipMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
@@ -11,6 +12,7 @@ func UnzipMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		if ce == "gzip" {
 			reader, err := gzip.NewReader(c.Request().Body)
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 			defer reader.Close()

@@ -3,21 +3,27 @@ package main
 import (
 	"flag"
 	"os"
+	"strconv"
 )
 
 type Config struct {
-	flagRunAddr string
-	pathForLogs string
+	flagRunAddr     string
+	storeInterval   int
+	fileStoragePath string
+	restore         bool
 }
 
 var conf Config
 
 func parseFlags() {
 	//conf := &Config{}
-	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
 	//flag.StringVar(&conf.flagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-	//TODO изменить на программное получение абсолютного пути к корневой директории проекта
-	//flag.StringVar(&conf.pathForLogs, "p", "/home/dip96/go_project/metrics/requests.log", "path for logs file")
+	//flag.StringVar(&conf.fileStoragePath, "f", "./metrics-db.json", "File to save metrics")
+
+	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&conf.fileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
+	flag.IntVar(&conf.storeInterval, "i", 30, "Interval to save metrics")
+	flag.BoolVar(&conf.restore, "r", true, "")
 
 	flag.Parse()
 
@@ -25,9 +31,17 @@ func parseFlags() {
 		conf.flagRunAddr = envRunAddr
 	}
 
-	//if envRunAddr := os.Getenv("PATH_FOR_FILE_LOGS"); envRunAddr != "" {
-	//	conf.flagRunAddr = envRunAddr
-	//}
+	if envStoreInterval := os.Getenv("STORE_INTERVAL"); envStoreInterval != "" {
+		conf.storeInterval, _ = strconv.Atoi(envStoreInterval)
+	}
+
+	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
+		conf.fileStoragePath = envStoragePath
+	}
+
+	if envRestore := os.Getenv("FILE_STORAGE_PATH"); envRestore != "" {
+		conf.restore, _ = strconv.ParseBool(envRestore)
+	}
 
 	//return conf
 }

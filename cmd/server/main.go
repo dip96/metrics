@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -9,8 +10,11 @@ import (
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 )
 
 type MetricType string
@@ -249,22 +253,7 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.Logger)
 	e.Use(middleware.UnzipMiddleware)
-	//e.Use(echoMiddleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
-	//	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
-	//	if acceptEncoding == "gzip" {
-	//		b, err := utils.GzipCompress(resBody)
-	//
-	//		if err != nil {
-	//			log.Fatal("Error when compress data:", err.Error())
-	//		}
-	//
-	//		fmt.Printf("%d bytes has been compressed to bytes\r\n", len(b))
-	//	}
-	//	c.Response().Header().Set("Content-Encoding", "gzip")
-	//}))
-	//e.Use(echoMiddleware.Gzip())// не работает по какой-то причине
 
-	//TODO нужно ли удалять два нижних роута?
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)
 	e.GET("/value/:type_metric/:name_metric", getMetric)
 	e.GET("/", getAllMetrics)
@@ -276,9 +265,152 @@ func main() {
 		metrics: make(map[string]Metric),
 	}
 
+	initMetrics()
+
+	go saveMetrics()
+
 	fmt.Println("Running server on", conf.flagRunAddr)
 	err := e.Start(conf.flagRunAddr)
 	if err != nil {
 		panic(err)
 	}
+}
+
+// TODO вынести в отдельный файл
+func initMetrics() {
+	Consumer, err := NewConsumer(conf.fileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer Consumer.Close()
+
+	for {
+		metric, err := Consumer.ReadEvent()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+
+		err = storage.Set(metric.ID, *metric)
+		if err != nil {
+			log.Error(err)
+		}
+	}
+}
+
+// TODO вынести в отдельный файл internal/storage/storageMetrics
+func saveMetrics() error {
+	ticker := time.NewTicker(time.Duration(conf.storeInterval) * time.Second)
+
+	if conf.restore {
+		for {
+			select {
+			case <-ticker.C:
+				Producer, err := NewProducer(conf.fileStoragePath)
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer Producer.Close()
+
+				metrics, _ := storage.GetAll()
+				for metric, _ := range metrics {
+
+					if err := Producer.WriteEvent(metrics[metric]); err != nil {
+						log.Fatal(err)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+type Producer struct {
+	file *os.File
+	// добавляем Writer в Producer
+	writer *bufio.Writer
+}
+
+func NewProducer(filename string) (*Producer, error) {
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_TRUNC, 0666)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Producer{
+		file: file,
+		// создаём новый Writer
+		writer: bufio.NewWriter(file),
+	}, nil
+}
+
+func (p *Producer) WriteEvent(metric Metric) error {
+	data, err := json.Marshal(&metric)
+	if err != nil {
+		return err
+	}
+
+	// записываем событие в буфер
+	if _, err := p.writer.Write(data); err != nil {
+		return err
+	}
+
+	// добавляем перенос строки
+	if err := p.writer.WriteByte('\n'); err != nil {
+		return err
+	}
+
+	// записываем буфер в файл
+	return p.writer.Flush()
+}
+
+type Consumer struct {
+	file    *os.File
+	scanner *bufio.Scanner
+}
+
+func NewConsumer(filename string) (*Consumer, error) {
+	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Consumer{
+		file: file,
+		// создаём новый scanner
+		scanner: bufio.NewScanner(file),
+	}, nil
+}
+
+func (c *Consumer) ReadEvent() (*Metric, error) {
+	if !c.scanner.Scan() {
+		if c.scanner.Err() == nil {
+			return nil, io.EOF
+		}
+	}
+	// читаем данные из scanner
+	data := c.scanner.Bytes()
+
+	metric := Metric{}
+	err := json.Unmarshal(data, &metric)
+	if err != nil {
+		return nil, err
+	}
+
+	return &metric, nil
+}
+
+func (c *Consumer) Close() error {
+	return c.file.Close()
+}
+
+func (p *Producer) Close() error {
+	// закрываем файл
+	return p.file.Close()
 }
