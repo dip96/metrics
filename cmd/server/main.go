@@ -308,26 +308,23 @@ func saveMetrics() error {
 	ticker := time.NewTicker(time.Duration(conf.storeInterval) * time.Second)
 
 	if conf.restore {
-		for {
-			select {
-			case <-ticker.C:
-				Producer, err := NewProducer(conf.fileStoragePath)
-				if err != nil {
+		Producer, err := NewProducer(conf.fileStoragePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer Producer.Close()
+
+		for range ticker.C {
+
+			metrics, _ := storage.GetAll()
+			for metric := range metrics {
+
+				if err := Producer.WriteEvent(metrics[metric]); err != nil {
 					log.Fatal(err)
-				}
-				defer Producer.Close()
-
-				metrics, _ := storage.GetAll()
-				for metric, _ := range metrics {
-
-					if err := Producer.WriteEvent(metrics[metric]); err != nil {
-						log.Fatal(err)
-					}
 				}
 			}
 		}
 	}
-
 	return nil
 }
 
