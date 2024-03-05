@@ -99,8 +99,8 @@ func collectRuntimeGauges() []Metrics {
 	gauges = append(gauges, createMetricFromUint64("Sys", string(MetricTypeGauge), memStats.Sys))
 	gauges = append(gauges, createMetricFromUint64("TotalAlloc", string(MetricTypeGauge), memStats.TotalAlloc))
 	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.StackInuse))
-	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.MSpanInuse))
-	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.MSpanSys))
+	gauges = append(gauges, createMetricFromUint64("MSpanInuse", string(MetricTypeGauge), memStats.MSpanInuse))
+	gauges = append(gauges, createMetricFromUint64("MSpanSys", string(MetricTypeGauge), memStats.MSpanSys))
 	gauges = append(gauges, createMetricFromFloat64("RandomValue", string(MetricTypeGauge), collectRandomValue()))
 
 	return gauges
@@ -121,19 +121,19 @@ func sendMetrics(metrics []Metrics) {
 		data, err := json.Marshal(metric)
 
 		if err != nil {
-			log.Fatal("Error when serialization object:", err)
+			log.Println("Error when serialization object:", err)
 		}
 
 		url := fmt.Sprintf("http://%s/update/", conf.flagRunAddr)
 		b, err := utils.GzipCompress(data)
 
 		if err != nil {
-			log.Fatal("Error when compress data:", err.Error())
+			log.Println("Error when compress data:", err.Error())
 		}
 
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 		if err != nil {
-			log.Fatal("Error when created request data:", err.Error())
+			log.Println("Error when created request data:", err.Error())
 		}
 
 		req.Header.Add("Content-Type", "application/json")
@@ -142,12 +142,12 @@ func sendMetrics(metrics []Metrics) {
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Fatal("Error when sending data:", err.Error())
-		}
-
-		err = resp.Body.Close()
-		if err != nil {
-			log.Fatal("Error closing the connection:", err)
+			log.Println("Error when sending data:", err.Error())
+		} else {
+			err = resp.Body.Close()
+			if err != nil {
+				log.Println("Error closing the connection:", err)
+			}
 		}
 	}
 }

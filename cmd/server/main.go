@@ -218,7 +218,7 @@ func AddMetricV2(c echo.Context) error {
 			log.Fatal("Error when compress data:", err.Error())
 		}
 
-		fmt.Printf("123 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
+		fmt.Printf("2 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
 	}
 
@@ -243,6 +243,18 @@ func GetMetricV2(c echo.Context) error {
 
 	if err != nil {
 		return c.String(http.StatusBadRequest, "")
+	}
+
+	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	if acceptEncoding == "gzip" {
+		b, err := utils.GzipCompress(jsonData)
+
+		if err != nil {
+			log.Fatal("Error when compress data:", err.Error())
+		}
+
+		fmt.Printf("1 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
+		c.Response().Header().Set("Content-Encoding", "gzip")
 	}
 
 	return c.JSONBlob(http.StatusOK, jsonData)
