@@ -165,6 +165,7 @@ func getAllMetrics(c echo.Context) error {
 
 	buf.WriteString("</ul></body></html>")
 
+	//TODO Повторяющийся фрагмент кода, вынести
 	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
 	if acceptEncoding == "gzip" {
 		b, err := utils.GzipCompress(buf.Bytes())
@@ -293,8 +294,8 @@ func main() {
 		metrics: make(map[string]Metric),
 	}
 
+	//TODO вынести логику в отдельный файл
 	initMetrics()
-
 	go saveMetrics()
 
 	fmt.Println("Running server on", conf.flagRunAddr)
@@ -336,14 +337,12 @@ func saveMetrics() error {
 	ticker := time.NewTicker(time.Duration(conf.storeInterval) * time.Second)
 
 	if conf.restore {
-		Producer, err := NewProducer(conf.fileStoragePath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer Producer.Close()
-
 		for range ticker.C {
-
+			Producer, err := NewProducer(conf.fileStoragePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+			//defer Producer.Close()
 			metrics, _ := storage.GetAll()
 			for metric := range metrics {
 
