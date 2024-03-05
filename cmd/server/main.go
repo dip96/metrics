@@ -165,6 +165,19 @@ func getAllMetrics(c echo.Context) error {
 
 	buf.WriteString("</ul></body></html>")
 
+	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	if acceptEncoding == "gzip" {
+		b, err := utils.GzipCompress(buf.Bytes())
+
+		if err != nil {
+			log.Fatal("Error when compress data:", err.Error())
+		}
+
+		fmt.Printf("3 %d bytes has been compressed to %d bytes\r\n", len(buf.String()), len(b))
+		c.Response().Header().Set("Content-Encoding", "gzip")
+		return c.HTMLBlob(http.StatusOK, b)
+	}
+
 	return c.HTML(http.StatusOK, buf.String())
 }
 
@@ -247,6 +260,7 @@ func GetMetricV2(c echo.Context) error {
 	}
 
 	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	//contentType := c.Request().Header.Get("Content-Type")
 	if acceptEncoding == "gzip" {
 		b, err := utils.GzipCompress(jsonData)
 
