@@ -220,9 +220,10 @@ func AddMetricV2(c echo.Context) error {
 
 		fmt.Printf("2 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
+		return c.JSONBlob(http.StatusOK, b)
 	}
 
-	return c.JSONBlob(http.StatusOK, jsonData)
+	return c.JSON(http.StatusOK, jsonData)
 }
 
 func GetMetricV2(c echo.Context) error {
@@ -255,9 +256,10 @@ func GetMetricV2(c echo.Context) error {
 
 		fmt.Printf("1 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
+		return c.JSONBlob(http.StatusOK, b)
 	}
 
-	return c.JSONBlob(http.StatusOK, jsonData)
+	return c.JSON(http.StatusOK, jsonData)
 }
 
 func main() {
