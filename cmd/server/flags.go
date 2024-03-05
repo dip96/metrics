@@ -18,12 +18,12 @@ var conf Config
 func parseFlags() {
 	//conf := &Config{}
 
-	//flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
-	//flag.StringVar(&conf.fileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
+	flag.StringVar(&conf.flagRunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&conf.fileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
 	flag.IntVar(&conf.storeInterval, "i", 30, "Interval to save metrics")
 	flag.BoolVar(&conf.restore, "r", true, "")
 
-	flag.StringVar(&conf.flagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
+	//flag.StringVar(&conf.flagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
 	//flag.StringVar(&conf.fileStoragePath, "f", "./metrics-db.json", "File to save metrics")
 
 	flag.Parse()
