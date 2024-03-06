@@ -296,7 +296,6 @@ func main() {
 	//TODO вынести логику в отдельный файл
 	initMetrics()
 	go UpdateMetrics()
-	defer NewProducer(conf.fileStoragePath)
 
 	fmt.Println("Running server on", conf.flagRunAddr)
 	err := e.Start(conf.flagRunAddr)

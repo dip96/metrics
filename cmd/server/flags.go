@@ -40,7 +40,7 @@ func parseFlags() {
 		conf.fileStoragePath = envStoragePath
 	}
 
-	if envRestore := os.Getenv("FILE_STORAGE_PATH"); envRestore != "" {
+	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
 		conf.restore, _ = strconv.ParseBool(envRestore)
 	}
 
