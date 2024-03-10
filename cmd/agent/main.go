@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/utils"
 	"log"
 	"math/rand"
@@ -27,10 +28,9 @@ type Metrics struct {
 }
 
 func main() {
-	parseFlags()
-
-	updateInterval := time.Duration(conf.flagRuntime) * time.Second
-	sendInterval := time.Duration(conf.flagReportInterval) * time.Second
+	cfg := config.LoadAgent()
+	updateInterval := time.Duration(cfg.FlagRuntime) * time.Second
+	sendInterval := time.Duration(cfg.FlagReportInterval) * time.Second
 
 	lastUpdateTime := time.Now()
 	lastSendTime := time.Now()
@@ -117,6 +117,7 @@ func collectRandomValue() float64 {
 }
 
 func sendMetrics(metrics []Metrics) {
+	cfg := config.LoadAgent()
 	for _, metric := range metrics {
 		data, err := json.Marshal(metric)
 
@@ -124,7 +125,7 @@ func sendMetrics(metrics []Metrics) {
 			log.Println("Error when serialization object:", err)
 		}
 
-		url := fmt.Sprintf("http://%s/update/", conf.flagRunAddr)
+		url := fmt.Sprintf("http://%s/update/", cfg.FlagRunAddr)
 		b, err := utils.GzipCompress(data)
 
 		if err != nil {

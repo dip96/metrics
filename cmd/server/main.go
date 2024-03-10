@@ -1,112 +1,46 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/middleware"
+	metricModel "github.com/dip96/metrics/internal/model/metric"
+	"github.com/dip96/metrics/internal/storage/files"
+	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
-	log "github.com/sirupsen/logrus"
-	"io"
+	"log"
 	"net/http"
-	"os"
 	"strconv"
-	"time"
 )
 
-type MetricType string
-
-const (
-	MetricTypeGauge   MetricType = "gauge"
-	MetricTypeCounter MetricType = "counter"
-)
-
-type Metric struct {
-	ID             string     `json:"id"`              // имя метрики
-	MType          MetricType `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta          *int64     `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value          *float64   `json:"value,omitempty"` // значение метрики в случае передачи gauge
-	fullValueGauge string     //float64 обрезает нули
-}
-
-func (m Metric) GetValueForDisplay() (string, error) {
-	if m.MType == MetricTypeCounter {
-		return fmt.Sprintf("%d", *m.Delta), nil
-	}
-
-	if m.MType == MetricTypeGauge {
-		return m.fullValueGauge, nil
-	}
-
-	return "", errors.New("the metric type is incorrect")
-}
-
-func (m Metric) GetValue() (string, error) {
-	if m.MType == MetricTypeCounter {
-		return fmt.Sprintf("%d", *m.Delta), nil
-	}
-
-	if m.MType == MetricTypeGauge {
-		return fmt.Sprintf("%f", *m.Value), nil
-	}
-
-	return "", errors.New("the metric type is incorrect")
-}
-
-// Структура для хранения метрик
-type MemStorage struct {
-	metrics map[string]Metric
-}
-
-func (m MemStorage) Get(name string) (Metric, error) {
-	value, ok := m.metrics[name]
-
-	if ok {
-		return value, nil
-	}
-
-	return Metric{}, errors.New("the metric was not found")
-}
-
-func (m MemStorage) Set(name string, metric Metric) error {
-	m.metrics[name] = metric
-	return nil
-}
-
-func (m MemStorage) GetAll() (map[string]Metric, error) {
-	return m.metrics, nil
-}
-
-// Хранилище метрик
-var storage *MemStorage
-
+// TODO вынести в отдельную директорию api
 func AddMetric(c echo.Context) error {
 	typeMetric := c.Param("type_metric")
 	nameMetric := c.Param("name_metric")
 	valueMetric := c.Param("value_metric")
 
-	metric, _ := storage.Get(nameMetric)
+	metric, _ := memStorage.MemStorage.Get(nameMetric)
 
-	if typeMetric == string(MetricTypeGauge) {
+	if typeMetric == string(metricModel.MetricTypeGauge) {
 		value, err := strconv.ParseFloat(valueMetric, 64)
 		if err != nil {
 			return c.String(http.StatusBadRequest, "")
 		}
 
-		metric.MType = MetricTypeGauge
+		metric.MType = metricModel.MetricTypeGauge
 		metric.Value = &value
-		metric.fullValueGauge = valueMetric
-	} else if typeMetric == string(MetricTypeCounter) {
+		metric.FullValueGauge = valueMetric
+	} else if typeMetric == string(metricModel.MetricTypeCounter) {
 		value, err := strconv.ParseInt(valueMetric, 10, 64)
 
 		if err != nil {
 			return c.String(http.StatusBadRequest, "")
 		}
 
-		metric.MType = MetricTypeCounter
+		metric.MType = metricModel.MetricTypeCounter
 		if metric.Delta == nil {
 			metric.Delta = &value
 		} else {
@@ -116,18 +50,14 @@ func AddMetric(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	err := storage.Set(nameMetric, metric)
-
-	if err != nil {
-		return c.String(http.StatusBadRequest, "")
-	}
+	memStorage.MemStorage.Set(nameMetric, metric)
 
 	return c.String(http.StatusOK, "")
 }
 
 func getMetric(c echo.Context) error {
 	name := c.Param("name_metric")
-	metric, err := storage.Get(name)
+	metric, err := memStorage.MemStorage.Get(name)
 
 	if err != nil {
 		return c.String(http.StatusNotFound, err.Error())
@@ -143,7 +73,7 @@ func getMetric(c echo.Context) error {
 }
 
 func getAllMetrics(c echo.Context) error {
-	metrics, err := storage.GetAll()
+	metrics, err := memStorage.MemStorage.GetAll()
 
 	if err != nil {
 		return err
@@ -183,7 +113,7 @@ func getAllMetrics(c echo.Context) error {
 }
 
 func AddMetricV2(c echo.Context) error {
-	body := new(Metric)
+	body := new(metricModel.Metric)
 
 	if err := c.Bind(body); err != nil {
 		return err
@@ -191,18 +121,18 @@ func AddMetricV2(c echo.Context) error {
 
 	typeMetric := body.MType
 	nameMetric := body.ID
-	metric, _ := storage.Get(nameMetric)
+	metric, _ := memStorage.MemStorage.Get(nameMetric)
 	metric.ID = body.ID
 
-	if typeMetric == MetricTypeGauge {
+	if typeMetric == metricModel.MetricTypeGauge {
 		valueMetric := body.Value
-		metric.MType = MetricTypeGauge
+		metric.MType = metricModel.MetricTypeGauge
 		metric.Value = valueMetric
-		metric.fullValueGauge = fmt.Sprintf("%f", *valueMetric)
-	} else if typeMetric == MetricTypeCounter {
+		metric.FullValueGauge = fmt.Sprintf("%f", *valueMetric)
+	} else if typeMetric == metricModel.MetricTypeCounter {
 		valueMetric := body.Delta
 		if metric.Delta == nil {
-			metric.MType = MetricTypeCounter
+			metric.MType = metricModel.MetricTypeCounter
 			metric.Delta = valueMetric
 		} else {
 			*metric.Delta += *valueMetric
@@ -211,11 +141,7 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	err := storage.Set(nameMetric, metric)
-
-	if err != nil {
-		return c.String(http.StatusBadRequest, "")
-	}
+	memStorage.MemStorage.Set(nameMetric, metric)
 
 	jsonData, err := json.Marshal(metric)
 
@@ -241,14 +167,14 @@ func AddMetricV2(c echo.Context) error {
 }
 
 func GetMetricV2(c echo.Context) error {
-	body := new(Metric)
+	body := new(metricModel.Metric)
 
 	if err := c.Bind(body); err != nil {
 		return err
 	}
 
 	nameMetric := body.ID
-	metric, err := storage.Get(nameMetric)
+	metric, err := memStorage.MemStorage.Get(nameMetric)
 
 	if err != nil {
 		return c.String(http.StatusNotFound, err.Error())
@@ -277,7 +203,8 @@ func GetMetricV2(c echo.Context) error {
 }
 
 func main() {
-	parseFlags()
+	cfg := config.LoadServer()
+
 	e := echo.New()
 	e.Use(middleware.Logger)
 	e.Use(middleware.UnzipMiddleware)
@@ -289,190 +216,17 @@ func main() {
 	e.POST("/update/", AddMetricV2)
 	e.POST("/value/", GetMetricV2)
 
-	storage = &MemStorage{
-		metrics: make(map[string]Metric),
+	if memStorage.MemStorage == nil {
+		memStorage.MemStorage = memStorage.NewStorage()
 	}
 
 	//TODO вынести логику в отдельный файл
-	initMetrics()
-	go UpdateMetrics()
+	files.InitMetrics()
+	go files.UpdateMetrics()
 
-	fmt.Println("Running server on", conf.flagRunAddr)
-	err := e.Start(conf.flagRunAddr)
+	fmt.Println("Running server on", cfg.FlagRunAddr)
+	err := e.Start(cfg.FlagRunAddr)
 	if err != nil {
 		panic(err)
 	}
-}
-
-// TODO вынести в отдельный файл
-func initMetrics() {
-	Consumer, err := NewConsumer(conf.fileStoragePath)
-	if err != nil {
-		log.Errorln(err)
-	}
-	defer Consumer.Close()
-
-	for {
-		metric, err := Consumer.ReadEvent()
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			log.Errorln(err)
-			continue
-		}
-
-		err = storage.Set(metric.ID, *metric)
-		if err != nil {
-			log.Errorln(err)
-		}
-	}
-}
-
-// TODO вынести в отдельный файл internal/storage/storageMetrics
-func UpdateMetrics() error {
-	ticker := time.NewTicker(time.Duration(conf.storeInterval) * time.Second)
-	if conf.restore {
-		for range ticker.C {
-			NewProducer(conf.fileStoragePath)
-		}
-	}
-	return nil
-}
-
-type Producer struct {
-	file *os.File
-	// добавляем Writer в Producer
-	writer *bufio.Writer
-}
-
-func saveMetrics(producer *Producer) {
-	metrics, _ := storage.GetAll()
-	for metric := range metrics {
-		if err := producer.WriteEvent(metrics[metric]); err != nil {
-			log.Errorln(err)
-		}
-	}
-}
-
-func NewProducer(filename string) {
-	_, err := os.Stat(filename)
-
-	if err == nil {
-		tmpFile, err := os.CreateTemp("", "*.tmp")
-		if err != nil {
-			log.Errorln("Error creating the tmp file:", err.Error())
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-
-		file, err := os.OpenFile(tmpFile.Name(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorln("Error opening the tmp file:", err.Error())
-			return
-		}
-
-		producer := &Producer{
-			file:   file,
-			writer: bufio.NewWriter(file),
-		}
-
-		saveMetrics(producer)
-
-		if err := producer.Close(); err != nil {
-			log.Errorln("Error closing the tmp file:", err.Error())
-			return
-		}
-
-		if err := os.Remove(filename); err != nil {
-			log.Errorln("Error removing the old file:", err.Error())
-			return
-		}
-
-		if err := os.Rename(tmpFile.Name(), filename); err != nil {
-			log.Errorln("Error renaming the file:", err.Error())
-			return
-		}
-		return
-	}
-
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Errorln("Error opening the file:", err.Error())
-		return
-	}
-
-	producer := &Producer{
-		file: file,
-		// создаём новый Writer
-		writer: bufio.NewWriter(file),
-	}
-	saveMetrics(producer)
-}
-
-func (p *Producer) WriteEvent(metric Metric) error {
-	data, err := json.Marshal(&metric)
-	if err != nil {
-		return err
-	}
-
-	// записываем событие в буфер
-	if _, err := p.writer.Write(data); err != nil {
-		return err
-	}
-
-	// добавляем перенос строки
-	if err := p.writer.WriteByte('\n'); err != nil {
-		return err
-	}
-
-	// записываем буфер в файл
-	return p.writer.Flush()
-}
-
-type Consumer struct {
-	file    *os.File
-	scanner *bufio.Scanner
-}
-
-func NewConsumer(filename string) (*Consumer, error) {
-	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Consumer{
-		file: file,
-		// создаём новый scanner
-		scanner: bufio.NewScanner(file),
-	}, nil
-}
-
-func (c *Consumer) ReadEvent() (*Metric, error) {
-	if !c.scanner.Scan() {
-		if c.scanner.Err() == nil {
-			return nil, io.EOF
-		}
-	}
-	// читаем данные из scanner
-	data := c.scanner.Bytes()
-
-	metric := Metric{}
-	err := json.Unmarshal(data, &metric)
-	if err != nil {
-		return nil, err
-	}
-
-	return &metric, nil
-}
-
-func (c *Consumer) Close() error {
-	return c.file.Close()
-}
-
-func (p *Producer) Close() error {
-	// закрываем файл
-	return p.file.Close()
 }
