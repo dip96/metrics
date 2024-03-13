@@ -9,6 +9,7 @@ import (
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/storage/files"
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
+	"github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
 	"log"
@@ -202,8 +203,25 @@ func GetMetricV2(c echo.Context) error {
 	return c.JSON(http.StatusOK, jsonData)
 }
 
+func ping(c echo.Context, db *postgres.DB) error {
+	ctx := c.Request().Context()
+
+	if err := db.Ping(ctx); err != nil {
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	return c.String(http.StatusOK, "")
+}
+
 func main() {
 	cfg := config.LoadServer()
+	db, err := postgres.NewDB()
+
+	if err != nil {
+		fmt.Printf("Failed to connect to database: %v\n", err)
+		panic(err)
+	}
+	defer db.Pool.Close()
 
 	e := echo.New()
 	e.Use(middleware.Logger)
@@ -216,6 +234,10 @@ func main() {
 	e.POST("/update/", AddMetricV2)
 	e.POST("/value/", GetMetricV2)
 
+	e.GET("/ping", func(c echo.Context) error {
+		return ping(c, db)
+	})
+
 	if memStorage.MemStorage == nil {
 		memStorage.MemStorage = memStorage.NewStorage()
 	}
@@ -225,7 +247,7 @@ func main() {
 	go files.UpdateMetrics()
 
 	fmt.Println("Running server on", cfg.FlagRunAddr)
-	err := e.Start(cfg.FlagRunAddr)
+	err = e.Start(cfg.FlagRunAddr)
 	if err != nil {
 		panic(err)
 	}
