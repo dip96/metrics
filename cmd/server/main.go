@@ -7,9 +7,10 @@ import (
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/middleware"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
+	storage "github.com/dip96/metrics/internal/storage"
 	"github.com/dip96/metrics/internal/storage/files"
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
-	"github.com/dip96/metrics/internal/storage/postgres"
+	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
 	"log"
@@ -23,7 +24,7 @@ func AddMetric(c echo.Context) error {
 	nameMetric := c.Param("name_metric")
 	valueMetric := c.Param("value_metric")
 
-	metric, _ := memStorage.MemStorage.Get(nameMetric)
+	metric, _ := storage.Storage.Get(nameMetric)
 
 	if typeMetric == string(metricModel.MetricTypeGauge) {
 		value, err := strconv.ParseFloat(valueMetric, 64)
@@ -51,14 +52,14 @@ func AddMetric(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	memStorage.MemStorage.Set(nameMetric, metric)
+	storage.Storage.Set(nameMetric, metric)
 
 	return c.String(http.StatusOK, "")
 }
 
 func getMetric(c echo.Context) error {
 	name := c.Param("name_metric")
-	metric, err := memStorage.MemStorage.Get(name)
+	metric, err := storage.Storage.Get(name)
 
 	if err != nil {
 		return c.String(http.StatusNotFound, err.Error())
@@ -74,7 +75,7 @@ func getMetric(c echo.Context) error {
 }
 
 func getAllMetrics(c echo.Context) error {
-	metrics, err := memStorage.MemStorage.GetAll()
+	metrics, err := storage.Storage.GetAll()
 
 	if err != nil {
 		return err
@@ -122,7 +123,7 @@ func AddMetricV2(c echo.Context) error {
 
 	typeMetric := body.MType
 	nameMetric := body.ID
-	metric, _ := memStorage.MemStorage.Get(nameMetric)
+	metric, _ := storage.Storage.Get(nameMetric)
 	metric.ID = body.ID
 
 	if typeMetric == metricModel.MetricTypeGauge {
@@ -142,7 +143,7 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	memStorage.MemStorage.Set(nameMetric, metric)
+	storage.Storage.Set(nameMetric, metric)
 
 	jsonData, err := json.Marshal(metric)
 
@@ -175,7 +176,7 @@ func GetMetricV2(c echo.Context) error {
 	}
 
 	nameMetric := body.ID
-	metric, err := memStorage.MemStorage.Get(nameMetric)
+	metric, err := storage.Storage.Get(nameMetric)
 
 	if err != nil {
 		return c.String(http.StatusNotFound, err.Error())
@@ -203,10 +204,8 @@ func GetMetricV2(c echo.Context) error {
 	return c.JSON(http.StatusOK, jsonData)
 }
 
-func ping(c echo.Context, db *postgres.DB) error {
-	ctx := c.Request().Context()
-
-	if err := db.Ping(ctx); err != nil {
+func ping(c echo.Context, db *postgresStorage.DB) error {
+	if err := db.Ping(); err != nil {
 		return c.String(http.StatusInternalServerError, "")
 	}
 
@@ -215,13 +214,6 @@ func ping(c echo.Context, db *postgres.DB) error {
 
 func main() {
 	cfg := config.LoadServer()
-	db, err := postgres.NewDB()
-
-	if err != nil {
-		fmt.Printf("Failed to connect to database: %v\n", err)
-		panic(err)
-	}
-	defer db.Pool.Close()
 
 	e := echo.New()
 	e.Use(middleware.Logger)
@@ -234,12 +226,28 @@ func main() {
 	e.POST("/update/", AddMetricV2)
 	e.POST("/value/", GetMetricV2)
 
-	e.GET("/ping", func(c echo.Context) error {
-		return ping(c, db)
-	})
+	if cfg.DatabaseDsn != "" {
+		db, err := postgresStorage.NewDB()
+		if err != nil {
+			fmt.Printf("Failed to connect to database: %v\n", err)
+			panic(err)
+		}
+		defer db.Pool.Close()
 
-	if memStorage.MemStorage == nil {
-		memStorage.MemStorage = memStorage.NewStorage()
+		err = db.CreateTable()
+
+		if err != nil {
+			fmt.Printf("Failed to create to table: %v\n", err)
+			panic(err)
+		}
+
+		e.GET("/ping", func(c echo.Context) error {
+			return ping(c, db)
+		})
+
+		storage.Storage = db
+	} else {
+		storage.Storage = memStorage.NewStorage()
 	}
 
 	//TODO вынести логику в отдельный файл
@@ -247,7 +255,7 @@ func main() {
 	go files.UpdateMetrics()
 
 	fmt.Println("Running server on", cfg.FlagRunAddr)
-	err = e.Start(cfg.FlagRunAddr)
+	err := e.Start(cfg.FlagRunAddr)
 	if err != nil {
 		panic(err)
 	}

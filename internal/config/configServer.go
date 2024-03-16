@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"strconv"
 )
@@ -22,12 +21,13 @@ func LoadServer() *Server {
 		var cfg = Server{}
 
 		flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
+		flag.StringVar(&cfg.DatabaseDsn, "d", "", "")
 		flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
 		flag.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
 		flag.BoolVar(&cfg.Restore, "r", true, "")
-		flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
 
 		//flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
+		//flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
 		//flag.StringVar(&cfg.FileStoragePath, "f", "./metrics-db.json", "File to save metrics")
 
 		flag.Parse()
