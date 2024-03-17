@@ -7,7 +7,7 @@ import (
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/middleware"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
-	storage "github.com/dip96/metrics/internal/storage"
+	"github.com/dip96/metrics/internal/storage"
 	"github.com/dip96/metrics/internal/storage/files"
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
@@ -221,27 +221,19 @@ func AddMetrics(c echo.Context) error {
 	}
 
 	for _, metricValue := range metrics {
-		metric, _ := storage.Storage.Get(metricValue.ID)
-		if metricValue.MType == metricModel.MetricTypeGauge {
-			valueMetric := metricValue.Value
-			metric.ID = metricValue.ID
-			metric.MType = metricModel.MetricTypeGauge
-			metric.Value = valueMetric
-			metric.FullValueGauge = fmt.Sprintf("%f", *valueMetric)
-		} else if metricValue.MType == metricModel.MetricTypeCounter {
-			metric.ID = metricValue.ID
-			valueMetric := metricValue.Delta
-			if metric.Delta == nil {
-				metric.MType = metricModel.MetricTypeCounter
-				metric.Delta = valueMetric
-			} else {
-				*metric.Delta += *valueMetric
+		if metricValue.MType == metricModel.MetricTypeCounter {
+			metric, _ := storage.Storage.Get(metricValue.ID)
+			if metric.Delta != nil {
+				valueMetric := metric.Delta
+				*metricValue.Delta += *valueMetric
 			}
-		} else {
-			return c.String(http.StatusBadRequest, "")
 		}
+	}
 
-		storage.Storage.Set(metric)
+	err := storage.Storage.SetAll(metrics)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
 	}
 
 	jsonData, err := json.Marshal(metrics)

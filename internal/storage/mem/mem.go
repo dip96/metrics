@@ -29,6 +29,10 @@ func (m *Storage) GetAll() (map[string]metric.Metric, error) {
 	return m.metrics, nil
 }
 
+func (m *Storage) SetAll([]metric.Metric) error {
+	return nil
+}
+
 // NewStorage - конструктор для создания нового экземпляра Storage
 func NewStorage() *Storage {
 	return &Storage{
