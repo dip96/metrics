@@ -25,6 +25,7 @@ func AddMetric(c echo.Context) error {
 	valueMetric := c.Param("value_metric")
 
 	metric, _ := storage.Storage.Get(nameMetric)
+	metric.ID = nameMetric
 
 	if typeMetric == string(metricModel.MetricTypeGauge) {
 		value, err := strconv.ParseFloat(valueMetric, 64)
