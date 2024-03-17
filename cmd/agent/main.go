@@ -47,8 +47,8 @@ func main() {
 		}
 
 		// Отправляем метрики каждые 10 секунд
-		if time.Since(lastSendTime) > sendInterval {
-			sendMetrics(metrics)
+		if time.Since(lastSendTime) > sendInterval && len(metrics) > 0 {
+			sendMetricsButch(metrics)
 			lastSendTime = time.Now()
 		}
 	}
@@ -151,6 +151,42 @@ func sendMetrics(metrics []Metrics) {
 			}
 		}
 	}
+}
+
+func sendMetricsButch(metrics []Metrics) {
+	cfg := config.LoadAgent()
+	data, err := json.Marshal(metrics)
+
+	if err != nil {
+		log.Println("Error when serialization object:", err)
+	}
+
+	url := fmt.Sprintf("http://%s/updates/", cfg.FlagRunAddr)
+	b, err := utils.GzipCompress(data)
+
+	if err != nil {
+		log.Println("Error when compress data:", err.Error())
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		log.Println("Error when created request data:", err.Error())
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Content-Encoding", "gzip")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error when sending data:", err.Error())
+	} else {
+		err = resp.Body.Close()
+		if err != nil {
+			log.Println("Error closing the connection:", err)
+		}
+	}
+
 }
 
 func createMetricFromFloat64(name string, typeMetric string, value float64) Metrics {

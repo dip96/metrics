@@ -6,6 +6,6 @@ var Storage StorageInterface
 
 type StorageInterface interface {
 	Get(name string) (metric.Metric, error)
-	Set(name string, metric metric.Metric)
+	Set(metric metric.Metric)
 	GetAll() (map[string]metric.Metric, error)
 }

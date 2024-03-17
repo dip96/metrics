@@ -166,7 +166,7 @@ func InitMetrics() {
 			continue
 		}
 
-		storage.Storage.Set(metric.ID, *metric)
+		storage.Storage.Set(*metric)
 	}
 }
 

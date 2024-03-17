@@ -52,7 +52,7 @@ func AddMetric(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	storage.Storage.Set(nameMetric, metric)
+	storage.Storage.Set(metric)
 
 	return c.String(http.StatusOK, "")
 }
@@ -143,7 +143,7 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	storage.Storage.Set(nameMetric, metric)
+	storage.Storage.Set(metric)
 
 	jsonData, err := json.Marshal(metric)
 
@@ -212,6 +212,59 @@ func ping(c echo.Context, db *postgresStorage.DB) error {
 	return c.String(http.StatusOK, "")
 }
 
+func AddMetrics(c echo.Context) error {
+	var metrics []metricModel.Metric
+
+	if err := c.Bind(&metrics); err != nil {
+		return err
+	}
+
+	for _, metricValue := range metrics {
+		metric, _ := storage.Storage.Get(metricValue.ID)
+		if metricValue.MType == metricModel.MetricTypeGauge {
+			valueMetric := metricValue.Value
+			metric.ID = metricValue.ID
+			metric.MType = metricModel.MetricTypeGauge
+			metric.Value = valueMetric
+			metric.FullValueGauge = fmt.Sprintf("%f", *valueMetric)
+		} else if metricValue.MType == metricModel.MetricTypeCounter {
+			metric.ID = metricValue.ID
+			valueMetric := metricValue.Delta
+			if metric.Delta == nil {
+				metric.MType = metricModel.MetricTypeCounter
+				metric.Delta = valueMetric
+			} else {
+				*metric.Delta += *valueMetric
+			}
+		} else {
+			return c.String(http.StatusBadRequest, "")
+		}
+
+		storage.Storage.Set(metric)
+	}
+
+	jsonData, err := json.Marshal(metrics)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	//не получилось перезаписать данные в body используя middleware
+	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	if acceptEncoding == "gzip" {
+		b, err := utils.GzipCompress(jsonData)
+
+		if err != nil {
+			log.Fatal("Error when compress data:", err.Error())
+		}
+
+		fmt.Printf("2 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
+		c.Response().Header().Set("Content-Encoding", "gzip")
+		return c.JSONBlob(http.StatusOK, b)
+	}
+	return c.JSON(http.StatusOK, jsonData)
+}
+
 func main() {
 	cfg := config.LoadServer()
 
@@ -225,6 +278,8 @@ func main() {
 
 	e.POST("/update/", AddMetricV2)
 	e.POST("/value/", GetMetricV2)
+
+	e.POST("/updates/", AddMetrics)
 
 	if cfg.DatabaseDsn != "" {
 		db, err := postgresStorage.NewDB()

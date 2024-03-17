@@ -52,13 +52,14 @@ func (d *DB) Get(name string) (metricModel.Metric, error) {
 	return metrics, nil
 }
 
-func (d *DB) Set(name string, metric metricModel.Metric) {
+func (d *DB) Set(metric metricModel.Metric) {
 	err := d.Ping()
 
 	if err != nil {
 		panic(err)
 	}
 
+	//TODO использовать именованные параметры в запросе
 	sql := "INSERT INTO metrics (name_metric, type, delta, value)" +
 		"VALUES ($1,$2,$3,$4)" +
 		"ON CONFLICT (name_metric)" +
@@ -126,14 +127,28 @@ func (d *DB) CreateTable() error {
 		"id smallserial PRIMARY KEY, " +
 		"name_metric CHARACTER VARYING(100) UNIQUE, " +
 		"type CHARACTER VARYING(30) NOT NULL, " +
-		"delta double precision, " +
-		"value integer " +
+		"delta integer, " +
+		"value double precision " +
 		")"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	_, err = d.Pool.Exec(ctx, sql)
+
+	if err != nil {
+		panic(err)
+	}
+
+	indexNameMetricSQL := "CREATE INDEX IF NOT EXISTS idx_metrics_name_metric ON metrics (name_metric);"
+	_, err = d.Pool.Exec(ctx, indexNameMetricSQL)
+
+	if err != nil {
+		panic(err)
+	}
+
+	indexTypeSQL := "CREATE INDEX IF NOT EXISTS idx_metrics_type ON metrics (type);"
+	_, err = d.Pool.Exec(ctx, indexTypeSQL)
 
 	if err != nil {
 		panic(err)
