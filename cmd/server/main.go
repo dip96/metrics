@@ -220,17 +220,25 @@ func AddMetrics(c echo.Context) error {
 		return err
 	}
 
+	metricsSave := make(map[string]metricModel.Metric)
+
 	for _, metricValue := range metrics {
 		if metricValue.MType == metricModel.MetricTypeCounter {
 			metric, _ := storage.Storage.Get(metricValue.ID)
 			if metric.Delta != nil {
 				valueMetric := metric.Delta
-				*metricValue.Delta += *valueMetric
+				*metricsSave[metricValue.ID].Delta += *valueMetric
+			} else if _, ok := metricsSave[metricValue.ID]; ok {
+				*metricsSave[metricValue.ID].Delta += *metricValue.Delta
+			} else {
+				metricsSave[metricValue.ID] = metricValue
 			}
+		} else {
+			metricsSave[metricValue.ID] = metricValue
 		}
 	}
 
-	err := storage.Storage.SetAll(metrics)
+	err := storage.Storage.SetAll(metricsSave)
 
 	if err != nil {
 		return c.String(http.StatusBadRequest, "")

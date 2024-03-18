@@ -9,5 +9,5 @@ type StorageInterface interface {
 	Get(name string) (metric.Metric, error)
 	Set(metric metric.Metric)
 	GetAll() (map[string]metric.Metric, error)
-	SetAll([]metric.Metric) error
+	SetAll(map[string]metric.Metric) error
 }

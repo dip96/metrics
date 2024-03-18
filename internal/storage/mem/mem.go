@@ -27,7 +27,7 @@ func (m *Storage) GetAll() (map[string]metric.Metric, error) {
 	return m.metrics, nil
 }
 
-func (m *Storage) SetAll(metrics []metric.Metric) error {
+func (m *Storage) SetAll(metrics map[string]metric.Metric) error {
 	for _, metricValue := range metrics {
 		m.Set(metricValue)
 	}

@@ -79,7 +79,7 @@ func (d *DB) Set(metric metricModel.Metric) {
 	}
 }
 
-func (d *DB) SetAll(metrics []metricModel.Metric) error {
+func (d *DB) SetAll(metrics map[string]metricModel.Metric) error {
 	err := d.Ping()
 
 	if err != nil {
