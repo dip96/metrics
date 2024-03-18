@@ -5,8 +5,6 @@ import (
 	"github.com/dip96/metrics/internal/model/metric"
 )
 
-var MemStorage *Storage
-
 type Storage struct {
 	metrics map[string]metric.Metric
 }
@@ -29,7 +27,11 @@ func (m *Storage) GetAll() (map[string]metric.Metric, error) {
 	return m.metrics, nil
 }
 
-func (m *Storage) SetAll([]metric.Metric) error {
+func (m *Storage) SetAll(metrics []metric.Metric) error {
+	for _, metricValue := range metrics {
+		m.Set(metricValue)
+	}
+
 	return nil
 }
 
