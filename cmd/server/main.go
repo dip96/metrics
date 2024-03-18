@@ -236,9 +236,11 @@ func AddMetrics(c echo.Context) error {
 			} else {
 				*metricsSave[metricValue.ID].Delta += *metricValue.Delta
 			}
-		} else {
-			metricsSave[metricValue.ID] = metricValue
+
+			continue
 		}
+
+		metricsSave[metricValue.ID] = metricValue
 	}
 
 	err := storage.Storage.SetAll(metricsSave)
