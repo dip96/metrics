@@ -175,7 +175,7 @@ func (d *DB) CreateTable() error {
 		"id smallserial PRIMARY KEY, " +
 		"name_metric CHARACTER VARYING(100) UNIQUE, " +
 		"type CHARACTER VARYING(30) NOT NULL, " +
-		"delta integer, " +
+		"delta bigint, " +
 		"value double precision " +
 		")"
 
