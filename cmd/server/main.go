@@ -221,22 +221,25 @@ func AddMetrics(c echo.Context) error {
 	}
 
 	metricsSave := make(map[string]metricModel.Metric)
-
+	//TODO придумать что-нибудь получше
+	var newMetric bool
 	for _, metricValue := range metrics {
 		if metricValue.MType == metricModel.MetricTypeCounter {
 			metric, _ := storage.Storage.Get(metricValue.ID)
 
 			if _, ok := metricsSave[metricValue.ID]; !ok {
 				metricsSave[metricValue.ID] = metricValue
+				newMetric = true
 			}
 
 			if metric.Delta != nil {
 				valueMetric := metric.Delta
 				*metricsSave[metricValue.ID].Delta += *valueMetric
-			} else {
+			} else if !newMetric {
 				*metricsSave[metricValue.ID].Delta += *metricValue.Delta
 			}
 
+			newMetric = false
 			continue
 		}
 
