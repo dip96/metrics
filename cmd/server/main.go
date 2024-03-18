@@ -225,13 +225,16 @@ func AddMetrics(c echo.Context) error {
 	for _, metricValue := range metrics {
 		if metricValue.MType == metricModel.MetricTypeCounter {
 			metric, _ := storage.Storage.Get(metricValue.ID)
+
+			if _, ok := metricsSave[metricValue.ID]; !ok {
+				metricsSave[metricValue.ID] = metricValue
+			}
+
 			if metric.Delta != nil {
 				valueMetric := metric.Delta
 				*metricsSave[metricValue.ID].Delta += *valueMetric
-			} else if _, ok := metricsSave[metricValue.ID]; ok {
-				*metricsSave[metricValue.ID].Delta += *metricValue.Delta
 			} else {
-				metricsSave[metricValue.ID] = metricValue
+				*metricsSave[metricValue.ID].Delta += *metricValue.Delta
 			}
 		} else {
 			metricsSave[metricValue.ID] = metricValue
