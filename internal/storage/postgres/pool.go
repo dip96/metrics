@@ -105,3 +105,7 @@ func (pw *PoolWrapper) Begin(ctx context.Context) (pgx.Tx, error) {
 
 	return nil, nil
 }
+
+func (pw *PoolWrapper) Close() {
+	pw.pool.Close()
+}
