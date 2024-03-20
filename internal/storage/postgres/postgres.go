@@ -9,7 +9,7 @@ import (
 )
 
 type DB struct {
-	Pool *pgxpool.Pool
+	Pool *PoolWrapper
 }
 
 func NewDB() (*DB, error) {
@@ -18,7 +18,8 @@ func NewDB() (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DB{Pool: pool}, nil
+	wrappedPool := NewPoolWrapper(pool)
+	return &DB{Pool: wrappedPool}, nil
 }
 
 func (d *DB) Get(name string) (metricModel.Metric, error) {

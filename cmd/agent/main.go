@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
+	"github.com/dip96/metrics/internal/retriable"
 	"github.com/dip96/metrics/internal/utils"
 	"log"
 	"math/rand"
@@ -176,17 +177,28 @@ func sendMetricsButch(metrics []Metrics) {
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Println("Error when sending data:", err.Error())
-	} else {
+	//TODO вынести в отдельную функцию
+	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
+	for attempt, delay := range retryDelays {
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("Error when sending data (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
+			retriable.CheckError(err)
+			time.Sleep(delay)
+			continue
+		}
+
 		err = resp.Body.Close()
 		if err != nil {
 			log.Println("Error closing the connection:", err)
 		}
-	}
 
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			log.Println("Data sent successfully.")
+			return
+		}
+	}
 }
 
 func createMetricFromFloat64(name string, typeMetric string, value float64) Metrics {
