@@ -81,10 +81,6 @@ func (pw *PoolWrapper) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (pw *PoolWrapper) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
-	return pw.pool.QueryRow(ctx, sql, args)
-}
-
 func (pw *PoolWrapper) Begin(ctx context.Context) (pgx.Tx, error) {
 	//TODO вынести в отдельный метод логику повторным запросам
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
