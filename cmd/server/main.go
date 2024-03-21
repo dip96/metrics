@@ -1,10 +1,13 @@
 package main
 
+//TODO изменить наименования на корретные - https://go.dev/blog/package-names
+
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
+	"github.com/dip96/metrics/internal/database/migrator"
 	"github.com/dip96/metrics/internal/middleware"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/storage"
@@ -298,18 +301,20 @@ func main() {
 		}
 		defer db.Pool.Close()
 
-		err = db.CreateTable()
-
-		if err != nil {
-			fmt.Printf("Failed to create to table: %v\n", err)
-			panic(err)
-		}
-
 		e.GET("/ping", func(c echo.Context) error {
 			return ping(c, db)
 		})
 
 		storage.Storage = db
+		m, err := migrator.NewMigrator()
+
+		if err != nil {
+			log.Printf(err.Error())
+		}
+
+		if err := m.Up(); err != nil {
+			log.Printf(err.Error())
+		}
 	} else {
 		storage.Storage = memStorage.NewStorage()
 	}

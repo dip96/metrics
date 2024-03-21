@@ -165,47 +165,6 @@ func (d *DB) GetAll() (map[string]metricModel.Metric, error) {
 	return metrics, nil
 }
 
-func (d *DB) CreateTable() error {
-	err := d.Ping()
-
-	if err != nil {
-		panic(err)
-	}
-
-	sql := "CREATE TABLE IF NOT EXISTS metrics (" +
-		"id smallserial PRIMARY KEY, " +
-		"name_metric CHARACTER VARYING(100) UNIQUE, " +
-		"type CHARACTER VARYING(30) NOT NULL, " +
-		"delta bigint, " +
-		"value double precision " +
-		")"
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err = d.Pool.Exec(ctx, sql)
-
-	if err != nil {
-		panic(err)
-	}
-
-	indexNameMetricSQL := "CREATE INDEX IF NOT EXISTS idx_metrics_name_metric ON metrics (name_metric);"
-	_, err = d.Pool.Exec(ctx, indexNameMetricSQL)
-
-	if err != nil {
-		panic(err)
-	}
-
-	indexTypeSQL := "CREATE INDEX IF NOT EXISTS idx_metrics_type ON metrics (type);"
-	_, err = d.Pool.Exec(ctx, indexTypeSQL)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return nil
-}
-
 func (d *DB) Ping() error {
 	pingCtx := context.Background()
 
