@@ -309,11 +309,11 @@ func main() {
 		m, err := migrator.NewMigrator()
 
 		if err != nil {
-			log.Printf(err.Error())
+			log.Fatal(err.Error())
 		}
 
 		if err := m.Up(); err != nil {
-			log.Printf(err.Error())
+			log.Fatal(err.Error())
 		}
 	} else {
 		storage.Storage = memStorage.NewStorage()
