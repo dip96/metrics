@@ -43,6 +43,14 @@ func newMigrator() (*Migrator, error) {
 
 func (m *Migrator) Up() error {
 	if err := m.migrate.Up(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			return nil
+		}
+
+		if errors.Is(err, migrate.ErrNilVersion) {
+			return nil
+		}
+
 		return errors.Wrap(err, "error migrating up")
 	}
 
