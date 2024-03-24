@@ -13,6 +13,7 @@ type Server struct {
 	Restore         bool
 	DatabaseDsn     string
 	MigrationPath   string
+	Key             string
 }
 
 var ServerConfig *Server
@@ -27,6 +28,7 @@ func LoadServer() *Server {
 		flag.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
 		flag.BoolVar(&cfg.Restore, "r", true, "")
 		flag.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
+		flag.StringVar(&cfg.Key, "k", "", "key")
 
 		//flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
 		//flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
@@ -52,6 +54,10 @@ func LoadServer() *Server {
 
 		if envDatabaseDsn := os.Getenv("DATABASE_DSN"); envDatabaseDsn != "" {
 			cfg.DatabaseDsn = envDatabaseDsn
+		}
+
+		if envKey := os.Getenv("KEY"); envKey != "" {
+			cfg.Key = envKey
 		}
 
 		ServerConfig = &cfg

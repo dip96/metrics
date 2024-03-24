@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
+	"github.com/dip96/metrics/internal/hash"
 	"github.com/dip96/metrics/internal/retriable"
 	"github.com/dip96/metrics/internal/utils"
 	"log"
@@ -172,6 +173,11 @@ func sendMetricsButch(metrics []Metrics) {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if err != nil {
 		log.Println("Error when created request data:", err.Error())
+	}
+
+	hashAgent := hash.CalculateHashAgent(b)
+	if hashAgent != "" {
+		req.Header.Add("HashSHA256", hashAgent)
 	}
 
 	req.Header.Add("Content-Type", "application/json")
