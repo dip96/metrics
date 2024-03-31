@@ -54,7 +54,6 @@ func (p *Producer) Close() error {
 		log.Errorln("Error renaming the file:", err.Error())
 	}
 
-	defer os.Remove(filename)
 	return p.file.Close()
 }
 
@@ -136,12 +135,9 @@ func UpdateMetrics() error {
 	ticker := time.NewTicker(time.Duration(cfg.StoreInterval) * time.Second)
 	if cfg.Restore {
 		for range ticker.C {
-			_, err := os.Stat(cfg.FileStoragePath)
-			if err == nil {
-				producer := initTmpProducer()
-				SaveMetrics(producer)
-				producer.Close()
-			}
+			producer := initTmpProducer()
+			SaveMetrics(producer)
+			producer.Close()
 		}
 	}
 	return nil
