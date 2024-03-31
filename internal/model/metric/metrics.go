@@ -1,4 +1,4 @@
-package model
+package metric
 
 type MetricService interface {
 	GetValueForDisplay() (string, error)

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"github.com/dip96/metrics/internal/config"
+	ioModel "github.com/dip96/metrics/internal/model/io"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	log "github.com/sirupsen/logrus"
@@ -12,59 +13,9 @@ import (
 	"time"
 )
 
-func NewProducer(filename string) {
-	_, err := os.Stat(filename)
-
-	if err == nil {
-		tmpFile, err := os.CreateTemp("", "*.tmp")
-		if err != nil {
-			log.Errorln("Error creating the tmp file:", err.Error())
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-
-		file, err := os.OpenFile(tmpFile.Name(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			log.Errorln("Error opening the tmp file:", err.Error())
-			return
-		}
-
-		producer := &Producer{
-			file:   file,
-			writer: bufio.NewWriter(file),
-		}
-
-		SaveMetrics(producer)
-
-		if err := producer.Close(); err != nil {
-			log.Errorln("Error closing the tmp file:", err.Error())
-			return
-		}
-
-		if err := os.Remove(filename); err != nil {
-			log.Errorln("Error removing the old file:", err.Error())
-			return
-		}
-
-		if err := os.Rename(tmpFile.Name(), filename); err != nil {
-			log.Errorln("Error renaming the file:", err.Error())
-			return
-		}
-		return
-	}
-
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Errorln("Error opening the file:", err.Error())
-		return
-	}
-
-	producer := &Producer{
-		file: file,
-		// создаём новый Writer
-		writer: bufio.NewWriter(file),
-	}
-	SaveMetrics(producer)
+type Producer struct {
+	file   *os.File
+	writer *bufio.Writer
 }
 
 func (p *Producer) WriteEvent(metric metricModel.Metric) error {
@@ -87,27 +38,29 @@ func (p *Producer) WriteEvent(metric metricModel.Metric) error {
 	return p.writer.Flush()
 }
 
-type Producer struct {
-	file   *os.File
-	writer *bufio.Writer
+func (p *Producer) Close() error {
+	cfg := config.LoadServer()
+
+	filename := cfg.FileStoragePath
+	if err := p.file.Close(); err != nil {
+		log.Errorln("Error closing the tmp file:", err.Error())
+	}
+
+	if err := os.Remove(filename); err != nil {
+		log.Errorln("Error removing the old file:", err.Error())
+	}
+
+	if err := os.Rename(p.file.Name(), filename); err != nil {
+		log.Errorln("Error renaming the file:", err.Error())
+	}
+
+	defer os.Remove(filename)
+	return p.file.Close()
 }
 
 type Consumer struct {
 	file    *os.File
 	scanner *bufio.Scanner
-}
-
-func NewConsumer(filename string) (*Consumer, error) {
-	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Consumer{
-		file: file,
-		// создаём новый scanner
-		scanner: bufio.NewScanner(file),
-	}, nil
 }
 
 func (c *Consumer) ReadEvent() (*metricModel.Metric, error) {
@@ -129,15 +82,23 @@ func (c *Consumer) ReadEvent() (*metricModel.Metric, error) {
 }
 
 func (c *Consumer) Close() error {
+	c.file.Close()
 	return c.file.Close()
 }
 
-func (p *Producer) Close() error {
-	// закрываем файл
-	return p.file.Close()
+func NewConsumer(filename string) (*Consumer, error) {
+	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Consumer{
+		file:    file,
+		scanner: bufio.NewScanner(file),
+	}, nil
 }
 
-func SaveMetrics(producer *Producer) {
+func SaveMetrics(producer ioModel.ProducerInterface) {
 	metrics, _ := memStorage.MemStorage.GetAll()
 	for metric := range metrics {
 		if err := producer.WriteEvent(metrics[metric]); err != nil {
@@ -147,7 +108,7 @@ func SaveMetrics(producer *Producer) {
 }
 
 func InitMetrics() {
-	cfg := config.ServerConfig
+	cfg := config.LoadServer()
 	Consumer, err := NewConsumer(cfg.FileStoragePath)
 	if err != nil {
 		log.Errorln(err)
@@ -171,12 +132,37 @@ func InitMetrics() {
 }
 
 func UpdateMetrics() error {
-	cfg := config.ServerConfig
+	cfg := config.LoadServer()
 	ticker := time.NewTicker(time.Duration(cfg.StoreInterval) * time.Second)
 	if cfg.Restore {
 		for range ticker.C {
-			NewProducer(cfg.FileStoragePath)
+			_, err := os.Stat(cfg.FileStoragePath)
+			if err == nil {
+				producer := initTmpProducer()
+				SaveMetrics(producer)
+				producer.Close()
+			}
 		}
 	}
 	return nil
+}
+
+func initTmpProducer() *Producer {
+	cfg := config.LoadServer()
+	tmpFile, err := os.CreateTemp(cfg.DirStorageTmpPath, "*.tmp")
+	if err != nil {
+		log.Errorln("Error creating the tmp file:", err.Error())
+	}
+
+	file, err := os.OpenFile(tmpFile.Name(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Errorln("Error opening the tmp file:", err.Error())
+	}
+
+	producer := &Producer{
+		file:   file,
+		writer: bufio.NewWriter(file),
+	}
+
+	return producer
 }
