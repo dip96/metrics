@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
+	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/retriable"
 	"github.com/dip96/metrics/internal/utils"
 	"log"
@@ -13,20 +14,6 @@ import (
 	"runtime"
 	"time"
 )
-
-type MetricType string
-
-const (
-	MetricTypeGauge   MetricType = "gauge"
-	MetricTypeCounter MetricType = "counter"
-)
-
-type Metrics struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-}
 
 func main() {
 	cfg := config.LoadAgent()
@@ -38,7 +25,7 @@ func main() {
 
 	PollCount := int64(1)
 
-	var metrics []Metrics
+	var metrics []metricModel.Metric
 	for {
 		// Обновляем метрики каждые 2 секунды
 		if time.Since(lastUpdateTime) > updateInterval {
@@ -55,8 +42,8 @@ func main() {
 	}
 }
 
-func collectMetrics(PollCount int64) []Metrics {
-	var metrics []Metrics
+func collectMetrics(PollCount int64) []metricModel.Metric {
+	var metrics []metricModel.Metric
 
 	// метрики gauge
 	metrics = collectRuntimeGauges()
@@ -67,49 +54,49 @@ func collectMetrics(PollCount int64) []Metrics {
 	return metrics
 }
 
-func collectRuntimeGauges() []Metrics {
-	var gauges []Metrics
+func collectRuntimeGauges() []metricModel.Metric {
+	var gauges []metricModel.Metric
 
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
 
-	gauges = append(gauges, createMetricFromUint64("Alloc", string(MetricTypeGauge), memStats.Alloc))
-	gauges = append(gauges, createMetricFromUint64("BuckHashSys", string(MetricTypeGauge), memStats.BuckHashSys))
-	gauges = append(gauges, createMetricFromUint64("Frees", string(MetricTypeGauge), memStats.Frees))
-	gauges = append(gauges, createMetricFromFloat64("GCCPUFraction", string(MetricTypeGauge), memStats.GCCPUFraction))
-	gauges = append(gauges, createMetricFromUint64("GCSys", string(MetricTypeGauge), memStats.GCSys))
-	gauges = append(gauges, createMetricFromUint64("HeapAlloc", string(MetricTypeGauge), memStats.HeapAlloc))
-	gauges = append(gauges, createMetricFromUint64("HeapIdle", string(MetricTypeGauge), memStats.HeapIdle))
-	gauges = append(gauges, createMetricFromUint64("HeapInuse", string(MetricTypeGauge), memStats.HeapInuse))
-	gauges = append(gauges, createMetricFromUint64("HeapObjects", string(MetricTypeGauge), memStats.HeapObjects))
-	gauges = append(gauges, createMetricFromUint64("HeapReleased", string(MetricTypeGauge), memStats.HeapReleased))
-	gauges = append(gauges, createMetricFromUint64("HeapSys", string(MetricTypeGauge), memStats.HeapSys))
-	gauges = append(gauges, createMetricFromUint64("LastGC", string(MetricTypeGauge), memStats.LastGC))
-	gauges = append(gauges, createMetricFromUint64("Lookups", string(MetricTypeGauge), memStats.Lookups))
-	gauges = append(gauges, createMetricFromUint64("MCacheInuse", string(MetricTypeGauge), memStats.MCacheInuse))
-	gauges = append(gauges, createMetricFromUint64("Lookups", string(MetricTypeGauge), memStats.Lookups))
-	gauges = append(gauges, createMetricFromUint64("MCacheSys", string(MetricTypeGauge), memStats.MCacheSys))
-	gauges = append(gauges, createMetricFromUint64("Mallocs", string(MetricTypeGauge), memStats.Mallocs))
-	gauges = append(gauges, createMetricFromUint64("NextGC", string(MetricTypeGauge), memStats.NextGC))
-	gauges = append(gauges, createMetricFromUint32("NumForcedGC", string(MetricTypeGauge), memStats.NumForcedGC))
-	gauges = append(gauges, createMetricFromUint32("NumGC", string(MetricTypeGauge), memStats.NumGC))
-	gauges = append(gauges, createMetricFromUint64("OtherSys", string(MetricTypeGauge), memStats.OtherSys))
-	gauges = append(gauges, createMetricFromUint64("PauseTotalNs", string(MetricTypeGauge), memStats.PauseTotalNs))
-	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.StackInuse))
-	gauges = append(gauges, createMetricFromUint64("StackSys", string(MetricTypeGauge), memStats.StackSys))
-	gauges = append(gauges, createMetricFromUint64("Sys", string(MetricTypeGauge), memStats.Sys))
-	gauges = append(gauges, createMetricFromUint64("TotalAlloc", string(MetricTypeGauge), memStats.TotalAlloc))
-	gauges = append(gauges, createMetricFromUint64("StackInuse", string(MetricTypeGauge), memStats.StackInuse))
-	gauges = append(gauges, createMetricFromUint64("MSpanInuse", string(MetricTypeGauge), memStats.MSpanInuse))
-	gauges = append(gauges, createMetricFromUint64("MSpanSys", string(MetricTypeGauge), memStats.MSpanSys))
-	gauges = append(gauges, createMetricFromFloat64("RandomValue", string(MetricTypeGauge), collectRandomValue()))
+	gauges = append(gauges, createMetricFromUint64("Alloc", metricModel.MetricTypeGauge, memStats.Alloc))
+	gauges = append(gauges, createMetricFromUint64("BuckHashSys", metricModel.MetricTypeGauge, memStats.BuckHashSys))
+	gauges = append(gauges, createMetricFromUint64("Frees", metricModel.MetricTypeGauge, memStats.Frees))
+	gauges = append(gauges, createMetricFromFloat64("GCCPUFraction", metricModel.MetricTypeGauge, memStats.GCCPUFraction))
+	gauges = append(gauges, createMetricFromUint64("GCSys", metricModel.MetricTypeGauge, memStats.GCSys))
+	gauges = append(gauges, createMetricFromUint64("HeapAlloc", metricModel.MetricTypeGauge, memStats.HeapAlloc))
+	gauges = append(gauges, createMetricFromUint64("HeapIdle", metricModel.MetricTypeGauge, memStats.HeapIdle))
+	gauges = append(gauges, createMetricFromUint64("HeapInuse", metricModel.MetricTypeGauge, memStats.HeapInuse))
+	gauges = append(gauges, createMetricFromUint64("HeapObjects", metricModel.MetricTypeGauge, memStats.HeapObjects))
+	gauges = append(gauges, createMetricFromUint64("HeapReleased", metricModel.MetricTypeGauge, memStats.HeapReleased))
+	gauges = append(gauges, createMetricFromUint64("HeapSys", metricModel.MetricTypeGauge, memStats.HeapSys))
+	gauges = append(gauges, createMetricFromUint64("LastGC", metricModel.MetricTypeGauge, memStats.LastGC))
+	gauges = append(gauges, createMetricFromUint64("Lookups", metricModel.MetricTypeGauge, memStats.Lookups))
+	gauges = append(gauges, createMetricFromUint64("MCacheInuse", metricModel.MetricTypeGauge, memStats.MCacheInuse))
+	gauges = append(gauges, createMetricFromUint64("Lookups", metricModel.MetricTypeGauge, memStats.Lookups))
+	gauges = append(gauges, createMetricFromUint64("MCacheSys", metricModel.MetricTypeGauge, memStats.MCacheSys))
+	gauges = append(gauges, createMetricFromUint64("Mallocs", metricModel.MetricTypeGauge, memStats.Mallocs))
+	gauges = append(gauges, createMetricFromUint64("NextGC", metricModel.MetricTypeGauge, memStats.NextGC))
+	gauges = append(gauges, createMetricFromUint32("NumForcedGC", metricModel.MetricTypeGauge, memStats.NumForcedGC))
+	gauges = append(gauges, createMetricFromUint32("NumGC", metricModel.MetricTypeGauge, memStats.NumGC))
+	gauges = append(gauges, createMetricFromUint64("OtherSys", metricModel.MetricTypeGauge, memStats.OtherSys))
+	gauges = append(gauges, createMetricFromUint64("PauseTotalNs", metricModel.MetricTypeGauge, memStats.PauseTotalNs))
+	gauges = append(gauges, createMetricFromUint64("StackInuse", metricModel.MetricTypeGauge, memStats.StackInuse))
+	gauges = append(gauges, createMetricFromUint64("StackSys", metricModel.MetricTypeGauge, memStats.StackSys))
+	gauges = append(gauges, createMetricFromUint64("Sys", metricModel.MetricTypeGauge, memStats.Sys))
+	gauges = append(gauges, createMetricFromUint64("TotalAlloc", metricModel.MetricTypeGauge, memStats.TotalAlloc))
+	gauges = append(gauges, createMetricFromUint64("StackInuse", metricModel.MetricTypeGauge, memStats.StackInuse))
+	gauges = append(gauges, createMetricFromUint64("MSpanInuse", metricModel.MetricTypeGauge, memStats.MSpanInuse))
+	gauges = append(gauges, createMetricFromUint64("MSpanSys", metricModel.MetricTypeGauge, memStats.MSpanSys))
+	gauges = append(gauges, createMetricFromFloat64("RandomValue", metricModel.MetricTypeGauge, collectRandomValue()))
 
 	return gauges
 }
 
-func collectPollCount(PollCount int64) []Metrics {
-	var counter []Metrics
-	counter = append(counter, createMetricFromInt64("PollCount", string(MetricTypeCounter), PollCount))
+func collectPollCount(PollCount int64) []metricModel.Metric {
+	var counter []metricModel.Metric
+	counter = append(counter, createMetricFromInt64("PollCount", metricModel.MetricTypeCounter, PollCount))
 	return counter
 }
 
@@ -117,7 +104,7 @@ func collectRandomValue() float64 {
 	return rand.Float64()
 }
 
-func sendMetrics(metrics []Metrics) {
+func sendMetrics(metrics []metricModel.Metric) {
 	cfg := config.LoadAgent()
 	for _, metric := range metrics {
 		data, err := json.Marshal(metric)
@@ -145,6 +132,7 @@ func sendMetrics(metrics []Metrics) {
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Println("Error when sending data:", err.Error())
+			return
 		} else {
 			err = resp.Body.Close()
 			if err != nil {
@@ -154,7 +142,7 @@ func sendMetrics(metrics []Metrics) {
 	}
 }
 
-func sendMetricsButch(metrics []Metrics) {
+func sendMetricsButch(metrics []metricModel.Metric) {
 	cfg := config.LoadAgent()
 	data, err := json.Marshal(metrics)
 
@@ -201,16 +189,16 @@ func sendMetricsButch(metrics []Metrics) {
 	}
 }
 
-func createMetricFromFloat64(name string, typeMetric string, value float64) Metrics {
-	var metric Metrics
+func createMetricFromFloat64(name string, typeMetric metricModel.MetricType, value float64) metricModel.Metric {
+	var metric metricModel.Metric
 	metric.ID = name
 	metric.MType = typeMetric
 	metric.Value = &value
 	return metric
 }
 
-func createMetricFromUint64(name string, typeMetric string, value uint64) Metrics {
-	var metric Metrics
+func createMetricFromUint64(name string, typeMetric metricModel.MetricType, value uint64) metricModel.Metric {
+	var metric metricModel.Metric
 	metric.ID = name
 	metric.MType = typeMetric
 	floatValue := float64(value)
@@ -218,16 +206,16 @@ func createMetricFromUint64(name string, typeMetric string, value uint64) Metric
 	return metric
 }
 
-func createMetricFromInt64(name string, typeMetric string, value int64) Metrics {
-	var metric Metrics
+func createMetricFromInt64(name string, typeMetric metricModel.MetricType, value int64) metricModel.Metric {
+	var metric metricModel.Metric
 	metric.ID = name
 	metric.MType = typeMetric
 	metric.Delta = &value
 	return metric
 }
 
-func createMetricFromUint32(name string, typeMetric string, value uint32) Metrics {
-	var metric Metrics
+func createMetricFromUint32(name string, typeMetric metricModel.MetricType, value uint32) metricModel.Metric {
+	var metric metricModel.Metric
 	metric.ID = name
 	metric.MType = typeMetric
 	floatValue := float64(value)

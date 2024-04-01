@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
+	"io"
 )
 
 func UnzipMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
@@ -15,7 +16,22 @@ func UnzipMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				log.Error(err)
 				return err
 			}
-			defer reader.Close()
+			defer func(reader *gzip.Reader) {
+				err := reader.Close()
+				if err != nil {
+					//достоточно ли просто лога о том, что была ошибка в defer?
+					//или же нужны дополнительные маципуляции в данном случаи?
+					log.Error("Reader.Close - error")
+				}
+			}(reader)
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				if err != nil {
+					//достоточно ли просто лога о том, что была ошибка в defer?
+					//или же нужны дополнительные маципуляции в данном случаи?
+					log.Error("Body.Close - error")
+				}
+			}(c.Request().Body)
 			c.Request().Body = reader
 		}
 		err := next(c)

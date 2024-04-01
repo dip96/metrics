@@ -7,55 +7,61 @@ import (
 )
 
 type Server struct {
-	FlagRunAddr     string
-	StoreInterval   int
-	FileStoragePath string
-	Restore         bool
-	DatabaseDsn     string
-	MigrationPath   string
+	FlagRunAddr       string
+	StoreInterval     int
+	FileStoragePath   string
+	DirStorageTmpPath string
+	Restore           bool
+	DatabaseDsn       string
+	MigrationPath     string
 }
 
-var ServerConfig *Server
+var serverConfig *Server
 
 func LoadServer() *Server {
-	if ServerConfig == nil {
-		var cfg = Server{}
+	initOnce.Do(func() {
+		serverConfig = initServerConfig()
+	})
 
-		flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
-		flag.StringVar(&cfg.DatabaseDsn, "d", "", "")
-		flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
-		flag.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
-		flag.BoolVar(&cfg.Restore, "r", true, "")
-		flag.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
+	return serverConfig
+}
 
-		//flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-		//flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
-		//flag.StringVar(&cfg.FileStoragePath, "f", "./metrics-db.json", "File to save metrics")
+func initServerConfig() *Server {
+	var cfg = Server{}
 
-		flag.Parse()
+	flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&cfg.DatabaseDsn, "d", "", "")
+	flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
+	flag.StringVar(&cfg.DirStorageTmpPath, "", "/tmp", "Dir storage tmp file")
+	flag.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
+	flag.BoolVar(&cfg.Restore, "r", true, "")
+	flag.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
 
-		if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
-			cfg.FlagRunAddr = envRunAddr
-		}
+	//flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
+	//flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
+	//flag.StringVar(&cfg.FileStoragePath, "f", "./metrics-db.json", "File to save metrics")
 
-		if envStoreInterval := os.Getenv("STORE_INTERVAL"); envStoreInterval != "" {
-			cfg.StoreInterval, _ = strconv.Atoi(envStoreInterval)
-		}
+	flag.Parse()
 
-		if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
-			cfg.FileStoragePath = envStoragePath
-		}
-
-		if envRestore := os.Getenv("RESTORE"); envRestore != "" {
-			cfg.Restore, _ = strconv.ParseBool(envRestore)
-		}
-
-		if envDatabaseDsn := os.Getenv("DATABASE_DSN"); envDatabaseDsn != "" {
-			cfg.DatabaseDsn = envDatabaseDsn
-		}
-
-		ServerConfig = &cfg
+	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
+		cfg.FlagRunAddr = envRunAddr
 	}
 
-	return ServerConfig
+	if envStoreInterval := os.Getenv("STORE_INTERVAL"); envStoreInterval != "" {
+		cfg.StoreInterval, _ = strconv.Atoi(envStoreInterval)
+	}
+
+	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
+		cfg.FileStoragePath = envStoragePath
+	}
+
+	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
+		cfg.Restore, _ = strconv.ParseBool(envRestore)
+	}
+
+	if envDatabaseDsn := os.Getenv("DATABASE_DSN"); envDatabaseDsn != "" {
+		cfg.DatabaseDsn = envDatabaseDsn
+	}
+
+	return &cfg
 }
