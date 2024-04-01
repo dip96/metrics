@@ -6,7 +6,7 @@ import (
 	"github.com/dip96/metrics/internal/config"
 	ioModel "github.com/dip96/metrics/internal/model/io"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
-	memStorage "github.com/dip96/metrics/internal/storage/mem"
+	"github.com/dip96/metrics/internal/storage"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
@@ -98,7 +98,7 @@ func NewConsumer(filename string) (*Consumer, error) {
 }
 
 func SaveMetrics(producer ioModel.ProducerInterface) {
-	metrics, _ := memStorage.MemStorage.GetAll()
+	metrics, _ := storage.Storage.GetAll()
 	for metric := range metrics {
 		if err := producer.WriteEvent(metrics[metric]); err != nil {
 			log.Errorln(err)
@@ -126,7 +126,7 @@ func InitMetrics() {
 			continue
 		}
 
-		memStorage.MemStorage.Set(metric.ID, *metric)
+		storage.Storage.Set(*metric)
 	}
 }
 
