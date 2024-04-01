@@ -1,2 +1,6 @@
 https://habr.com/ru/companies/vk/articles/463063/ - интерфейсы
-запуск тестов - ./metricstest -test.v -test.run=^TestIteration1$ -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server
+запуск тестов:
+./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
+./metricstest -test.v -test.run=^TestIteration7 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
+./metricstest -test.v -test.run=^TestIteration8 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
+./metricstest -test.v -test.run=^TestIteration9 -file-storage-path=cmd/server/metrics-db.json -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
