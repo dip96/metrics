@@ -85,9 +85,9 @@ func (pw *PoolWrapper) Begin(ctx context.Context) (pgx.Tx, error) {
 	//TODO вынести в отдельный метод логику повторным запросам
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	for attempt, delay := range retryDelays {
-		pgx, err := pw.pool.BeginTx(ctx, pgx.TxOptions{})
+		tx, err := pw.pool.BeginTx(ctx, pgx.TxOptions{})
 		if err == nil {
-			return pgx, err
+			return tx, err
 		}
 		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
 
