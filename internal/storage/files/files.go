@@ -126,7 +126,13 @@ func InitMetrics() {
 			continue
 		}
 
-		storage.Storage.Set(*metric)
+		err = storage.Storage.Set(*metric)
+
+		if err != nil {
+			log.Errorln(err)
+			continue
+		}
+
 	}
 }
 

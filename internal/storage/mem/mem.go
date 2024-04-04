@@ -19,8 +19,9 @@ func (m *Storage) Get(name string) (metric.Metric, error) {
 	return metric.Metric{}, errors.New("the metric was not found")
 }
 
-func (m *Storage) Set(metric metric.Metric) {
+func (m *Storage) Set(metric metric.Metric) error {
 	m.metrics[metric.ID] = metric
+	return nil
 }
 
 func (m *Storage) GetAll() (map[string]metric.Metric, error) {

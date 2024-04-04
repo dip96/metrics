@@ -56,7 +56,11 @@ func AddMetric(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	storage.Storage.Set(metric)
+	err := storage.Storage.Set(metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
 
 	return c.String(http.StatusOK, "")
 }
@@ -147,7 +151,11 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	storage.Storage.Set(metric)
+	err := storage.Storage.Set(metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
 
 	jsonData, err := json.Marshal(metric)
 

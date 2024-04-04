@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
-	"github.com/dip96/metrics/internal/retriable"
 	"github.com/dip96/metrics/internal/utils"
 	"log"
 	"math/rand"
@@ -165,14 +164,13 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip")
 
+	client := &http.Client{}
 	//TODO вынести в отдельную функцию
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	for attempt, delay := range retryDelays {
-		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Printf("Error when sending data (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-			retriable.CheckError(err)
 			time.Sleep(delay)
 			continue
 		}
