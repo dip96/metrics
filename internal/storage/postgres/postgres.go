@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/dip96/metrics/internal/config"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"time"
 )
@@ -100,13 +99,11 @@ func (d *DB) SetAll(metrics map[string]metricModel.Metric) error {
 		"DO UPDATE SET delta = excluded.delta, value = excluded.value"
 
 	for _, metricValue := range metrics {
-		_, err = tx.Exec(ctx, sql,
-			pgx.NamedArgs{
-				"name":  metricValue.ID,
-				"type":  metricValue.MType,
-				"delta": metricValue.Delta,
-				"value": metricValue.Value,
-			},
+		_, err = tx.Exec(context.Background(), sql,
+			metricValue.ID,
+			metricValue.MType,
+			metricValue.Delta,
+			metricValue.Value,
 		)
 		if err != nil {
 			return err

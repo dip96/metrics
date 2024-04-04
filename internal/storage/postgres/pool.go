@@ -34,7 +34,7 @@ func (pw *PoolWrapper) Query(ctx context.Context, sql string, args ...any) (pgx.
 		}
 
 		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-		err = errors.Join(err, fmt.Errorf("retry %d: %w", attempt, err))
+		errors.Join(err, fmt.Errorf("retry %d: %w", attempt, err))
 		time.Sleep(delay)
 	}
 
