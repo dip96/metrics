@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/dip96/metrics/internal/retriable"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -24,15 +26,15 @@ func (pw *PoolWrapper) Query(ctx context.Context, sql string, args ...any) (pgx.
 	for attempt, delay := range retryDelays {
 		rows, err := pw.pool.Query(ctx, sql, args...)
 		if err == nil {
-			return rows, err
+			return rows, nil
 		}
-		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-		retriable.CheckError(err)
 
 		if !retriable.IsConnectionException(err) {
 			return nil, err
 		}
 
+		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
+		errors.Join(err, fmt.Errorf("retry %d: %w", attempt, err))
 		time.Sleep(delay)
 	}
 
@@ -48,7 +50,6 @@ func (pw *PoolWrapper) Exec(ctx context.Context, sql string, arguments ...any) (
 			return tag, err
 		}
 		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-		retriable.CheckError(err)
 
 		if !retriable.IsConnectionException(err) {
 			return tag, err
@@ -69,7 +70,6 @@ func (pw *PoolWrapper) Ping(ctx context.Context) error {
 			return err
 		}
 		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-		retriable.CheckError(err)
 
 		if !retriable.IsConnectionException(err) {
 			return err
@@ -85,12 +85,11 @@ func (pw *PoolWrapper) Begin(ctx context.Context) (pgx.Tx, error) {
 	//TODO вынести в отдельный метод логику повторным запросам
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	for attempt, delay := range retryDelays {
-		pgx, err := pw.pool.BeginTx(ctx, pgx.TxOptions{})
+		tx, err := pw.pool.BeginTx(ctx, pgx.TxOptions{})
 		if err == nil {
-			return pgx, err
+			return tx, err
 		}
 		log.Printf("Err (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-		retriable.CheckError(err)
 
 		if !retriable.IsConnectionException(err) {
 			return nil, err

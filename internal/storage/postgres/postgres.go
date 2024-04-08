@@ -24,9 +24,8 @@ func NewDB() (*DB, error) {
 
 func (d *DB) Get(name string) (metricModel.Metric, error) {
 	err := d.Ping()
-
 	if err != nil {
-		panic(err)
+		return metricModel.Metric{}, err
 	}
 
 	sql := "SELECT name_metric, type, delta, value FROM metrics " +
@@ -53,11 +52,10 @@ func (d *DB) Get(name string) (metricModel.Metric, error) {
 	return metrics, nil
 }
 
-func (d *DB) Set(metric metricModel.Metric) {
+func (d *DB) Set(metric metricModel.Metric) error {
 	err := d.Ping()
-
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	//TODO использовать именованные параметры в запросе
@@ -76,15 +74,16 @@ func (d *DB) Set(metric metricModel.Metric) {
 	)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
 
 func (d *DB) SetAll(metrics map[string]metricModel.Metric) error {
 	err := d.Ping()
-
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	ctx := context.Background()
@@ -92,47 +91,32 @@ func (d *DB) SetAll(metrics map[string]metricModel.Metric) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if p := recover(); p != nil {
-			tx.Rollback(ctx)
-			panic(p)
-		} else if err != nil {
-			tx.Rollback(ctx)
-		} else {
-			err = tx.Commit(ctx)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}()
+	defer tx.Rollback(ctx)
+
+	sql := "INSERT INTO metrics (name_metric, type, delta, value)" +
+		"VALUES ($1,$2,$3,$4)" +
+		"ON CONFLICT (name_metric)" +
+		"DO UPDATE SET delta = excluded.delta, value = excluded.value"
 
 	for _, metricValue := range metrics {
-		//Из-за d.Pool.Exec(насколько понял, что запрос выполняется в новом соединении) транзакция не работает
-		//d.Set(metricValue)
-
-		//TODO использовать именованные параметры в запросе
-		sql := "INSERT INTO metrics (name_metric, type, delta, value)" +
-			"VALUES ($1,$2,$3,$4)" +
-			"ON CONFLICT (name_metric)" +
-			"DO UPDATE SET delta = excluded.delta, value = excluded.value"
-
 		_, err = tx.Exec(context.Background(), sql,
 			metricValue.ID,
 			metricValue.MType,
 			metricValue.Delta,
 			metricValue.Value,
 		)
-
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (d *DB) GetAll() (map[string]metricModel.Metric, error) {
 	err := d.Ping()
-
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	sql := "SELECT name_metric, type, delta, value FROM metrics"
@@ -141,10 +125,10 @@ func (d *DB) GetAll() (map[string]metricModel.Metric, error) {
 	defer cancel()
 
 	rows, err := d.Pool.Query(ctx, sql)
-
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	metrics := make(map[string]metricModel.Metric)
 

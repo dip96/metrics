@@ -3,6 +3,7 @@ package mem
 import (
 	"errors"
 	"github.com/dip96/metrics/internal/model/metric"
+	log "github.com/sirupsen/logrus"
 )
 
 type Storage struct {
@@ -19,8 +20,9 @@ func (m *Storage) Get(name string) (metric.Metric, error) {
 	return metric.Metric{}, errors.New("the metric was not found")
 }
 
-func (m *Storage) Set(metric metric.Metric) {
+func (m *Storage) Set(metric metric.Metric) error {
 	m.metrics[metric.ID] = metric
+	return nil
 }
 
 func (m *Storage) GetAll() (map[string]metric.Metric, error) {
@@ -29,7 +31,10 @@ func (m *Storage) GetAll() (map[string]metric.Metric, error) {
 
 func (m *Storage) SetAll(metrics map[string]metric.Metric) error {
 	for _, metricValue := range metrics {
-		m.Set(metricValue)
+		err := m.Set(metricValue)
+		if err != nil {
+			log.Printf("Error setting metric %s: %v", metricValue.ID, err)
+		}
 	}
 
 	return nil

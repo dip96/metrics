@@ -7,7 +7,6 @@ import (
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/hash"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
-	"github.com/dip96/metrics/internal/retriable"
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
@@ -147,7 +146,6 @@ func collectMetrics(PollCount int64) []metricModel.Metric {
 
 	// метрики gauge
 	metrics = collectRuntimeGauges()
-	//metrics = append(metrics, collectGopsutilMetrics()...)
 
 	// счетчик PollCount
 	metrics = append(metrics, collectPollCount(PollCount)...)
@@ -291,14 +289,13 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip")
 
+	client := &http.Client{}
 	//TODO вынести в отдельную функцию
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	for attempt, delay := range retryDelays {
-		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Printf("Error when sending data (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
-			retriable.CheckError(err)
 			time.Sleep(delay)
 			continue
 		}
