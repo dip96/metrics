@@ -34,8 +34,8 @@ func main() {
 		}
 
 		// Отправляем метрики каждые 10 секунд
-		if time.Since(lastSendTime) > sendInterval {
-			sendMetrics(metrics)
+		if time.Since(lastSendTime) > sendInterval && len(metrics) > 0 {
+			sendMetricsButch(metrics)
 			lastSendTime = time.Now()
 		}
 	}
@@ -137,6 +137,52 @@ func sendMetrics(metrics []metricModel.Metric) {
 			if err != nil {
 				log.Println("Error closing the connection:", err)
 			}
+		}
+	}
+}
+
+func sendMetricsButch(metrics []metricModel.Metric) {
+	cfg := config.LoadAgent()
+	data, err := json.Marshal(metrics)
+
+	if err != nil {
+		log.Println("Error when serialization object:", err)
+	}
+
+	url := fmt.Sprintf("http://%s/updates/", cfg.FlagRunAddr)
+	b, err := utils.GzipCompress(data)
+
+	if err != nil {
+		log.Println("Error when compress data:", err.Error())
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		log.Println("Error when created request data:", err.Error())
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Content-Encoding", "gzip")
+
+	client := &http.Client{}
+	//TODO вынести в отдельную функцию
+	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
+	for attempt, delay := range retryDelays {
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("Error when sending data (attempt %d/%d): %v", attempt+1, len(retryDelays), err)
+			time.Sleep(delay)
+			continue
+		}
+
+		err = resp.Body.Close()
+		if err != nil {
+			log.Println("Error closing the connection:", err)
+		}
+
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			log.Println("Data sent successfully.")
+			return
 		}
 	}
 }

@@ -1,14 +1,19 @@
 package main
 
+//TODO изменить наименования на корретные - https://go.dev/blog/package-names
+
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
+	"github.com/dip96/metrics/internal/database/migrator"
 	"github.com/dip96/metrics/internal/middleware"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
+	"github.com/dip96/metrics/internal/storage"
 	"github.com/dip96/metrics/internal/storage/files"
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
+	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
 	"github.com/labstack/echo/v4"
 	"log"
@@ -22,7 +27,8 @@ func AddMetric(c echo.Context) error {
 	nameMetric := c.Param("name_metric")
 	valueMetric := c.Param("value_metric")
 
-	metric, _ := memStorage.MemStorage.Get(nameMetric)
+	metric, _ := storage.Storage.Get(nameMetric)
+	metric.ID = nameMetric
 
 	if typeMetric == string(metricModel.MetricTypeGauge) {
 		value, err := strconv.ParseFloat(valueMetric, 64)
@@ -50,14 +56,18 @@ func AddMetric(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	memStorage.MemStorage.Set(nameMetric, metric)
+	err := storage.Storage.Set(metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
 
 	return c.String(http.StatusOK, "")
 }
 
 func getMetric(c echo.Context) error {
 	name := c.Param("name_metric")
-	metric, err := memStorage.MemStorage.Get(name)
+	metric, err := storage.Storage.Get(name)
 
 	if err != nil {
 		return c.String(http.StatusNotFound, err.Error())
@@ -73,7 +83,7 @@ func getMetric(c echo.Context) error {
 }
 
 func getAllMetrics(c echo.Context) error {
-	metrics, err := memStorage.MemStorage.GetAll()
+	metrics, err := storage.Storage.GetAll()
 
 	if err != nil {
 		return err
@@ -121,7 +131,7 @@ func AddMetricV2(c echo.Context) error {
 
 	typeMetric := body.MType
 	nameMetric := body.ID
-	metric, _ := memStorage.MemStorage.Get(nameMetric)
+	metric, _ := storage.Storage.Get(nameMetric)
 	metric.ID = body.ID
 
 	if typeMetric == metricModel.MetricTypeGauge {
@@ -141,7 +151,11 @@ func AddMetricV2(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "")
 	}
 
-	memStorage.MemStorage.Set(nameMetric, metric)
+	err := storage.Storage.Set(metric)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
 
 	jsonData, err := json.Marshal(metric)
 
@@ -174,7 +188,7 @@ func GetMetricV2(c echo.Context) error {
 	}
 
 	nameMetric := body.ID
-	metric, err := memStorage.MemStorage.Get(nameMetric)
+	metric, err := storage.Storage.Get(nameMetric)
 
 	if err != nil {
 		return c.String(http.StatusNotFound, err.Error())
@@ -202,6 +216,75 @@ func GetMetricV2(c echo.Context) error {
 	return c.JSON(http.StatusOK, jsonData)
 }
 
+func ping(c echo.Context, db *postgresStorage.DB) error {
+	if err := db.Ping(); err != nil {
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	return c.String(http.StatusOK, "")
+}
+
+func AddMetrics(c echo.Context) error {
+	var metrics []metricModel.Metric
+
+	if err := c.Bind(&metrics); err != nil {
+		return err
+	}
+
+	metricsSave := make(map[string]metricModel.Metric)
+	//TODO придумать что-нибудь получше
+	var newMetric bool
+	for _, metricValue := range metrics {
+		if metricValue.MType == metricModel.MetricTypeCounter {
+			metric, _ := storage.Storage.Get(metricValue.ID)
+
+			if _, ok := metricsSave[metricValue.ID]; !ok {
+				metricsSave[metricValue.ID] = metricValue
+				newMetric = true
+			}
+
+			if metric.Delta != nil {
+				valueMetric := metric.Delta
+				*metricsSave[metricValue.ID].Delta += *valueMetric
+			} else if !newMetric {
+				*metricsSave[metricValue.ID].Delta += *metricValue.Delta
+			}
+
+			newMetric = false
+			continue
+		}
+
+		metricsSave[metricValue.ID] = metricValue
+	}
+
+	err := storage.Storage.SetAll(metricsSave)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	jsonData, err := json.Marshal(metrics)
+
+	if err != nil {
+		return c.String(http.StatusBadRequest, "")
+	}
+
+	//не получилось перезаписать данные в body используя middleware
+	acceptEncoding := c.Request().Header.Get("Accept-Encoding")
+	if acceptEncoding == "gzip" {
+		b, err := utils.GzipCompress(jsonData)
+
+		if err != nil {
+			log.Fatal("Error when compress data:", err.Error())
+		}
+
+		fmt.Printf("2 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
+		c.Response().Header().Set("Content-Encoding", "gzip")
+		return c.JSONBlob(http.StatusOK, b)
+	}
+	return c.JSON(http.StatusOK, jsonData)
+}
+
 func main() {
 	cfg := config.LoadServer()
 
@@ -216,8 +299,32 @@ func main() {
 	e.POST("/update/", AddMetricV2)
 	e.POST("/value/", GetMetricV2)
 
-	if memStorage.MemStorage == nil {
-		memStorage.MemStorage = memStorage.NewStorage()
+	e.POST("/updates/", AddMetrics)
+
+	if cfg.DatabaseDsn != "" {
+		db, err := postgresStorage.NewDB()
+		if err != nil {
+			fmt.Printf("Failed to connect to database: %v\n", err)
+			panic(err)
+		}
+		defer db.Pool.Close()
+
+		e.GET("/ping", func(c echo.Context) error {
+			return ping(c, db)
+		})
+
+		storage.Storage = db
+		m, err := migrator.NewMigrator()
+
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		if err := m.Up(); err != nil {
+			log.Fatal(err.Error())
+		}
+	} else {
+		storage.Storage = memStorage.NewStorage()
 	}
 
 	//TODO вынести логику в отдельный файл
