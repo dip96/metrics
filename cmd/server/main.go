@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/database/migrator"
+	"github.com/dip96/metrics/internal/hash"
 	"github.com/dip96/metrics/internal/middleware"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/storage"
@@ -174,9 +175,21 @@ func AddMetricV2(c echo.Context) error {
 
 		fmt.Printf("2 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
+
+		//возможно стоит высчитывать хеш до gzip
+		hashServer := hash.CalculateHashServer(b)
+		if hashServer != "" {
+			c.Response().Header().Set("HashSHA256", hashServer)
+		}
+
 		return c.JSONBlob(http.StatusOK, b)
 	}
 
+	//возможно стоит высчитывать хеш до gzip
+	hashServer := hash.CalculateHashServer(jsonData)
+	if hashServer != "" {
+		c.Response().Header().Set("HashSHA256", hashServer)
+	}
 	return c.JSON(http.StatusOK, jsonData)
 }
 
@@ -210,9 +223,19 @@ func GetMetricV2(c echo.Context) error {
 
 		fmt.Printf("1 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
+		//возможно стоит высчитывать хеш до gzip
+		hashServer := hash.CalculateHashServer(b)
+		if hashServer != "" {
+			c.Response().Header().Set("HashSHA256", hashServer)
+		}
 		return c.JSONBlob(http.StatusOK, b)
 	}
 
+	//возможно стоит высчитывать хеш до gzip
+	hashServer := hash.CalculateHashServer(jsonData)
+	if hashServer != "" {
+		c.Response().Header().Set("HashSHA256", hashServer)
+	}
 	return c.JSON(http.StatusOK, jsonData)
 }
 
@@ -280,7 +303,21 @@ func AddMetrics(c echo.Context) error {
 
 		fmt.Printf("2 %d bytes has been compressed to %d bytes\r\n", len(jsonData), len(b))
 		c.Response().Header().Set("Content-Encoding", "gzip")
+
+		//не получилось перезаписать данные в body используя middleware
+		//возможно стоит высчитывать хеш до gzip
+		hashServer := hash.CalculateHashServer(b)
+		if hashServer != "" {
+			c.Response().Header().Set("HashSHA256", hashServer)
+		}
+
 		return c.JSONBlob(http.StatusOK, b)
+	}
+
+	//не получилось перезаписать данные в body используя middleware
+	hashServer := hash.CalculateHashServer(jsonData)
+	if hashServer != "" {
+		c.Response().Header().Set("HashSHA256", hashServer)
 	}
 	return c.JSON(http.StatusOK, jsonData)
 }
@@ -290,6 +327,7 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.Logger)
+	e.Use(middleware.CheckHash)
 	e.Use(middleware.UnzipMiddleware)
 
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)

@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
+	"github.com/dip96/metrics/internal/hash"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/utils"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 	"log"
 	"math/rand"
 	"net/http"
@@ -15,28 +18,125 @@ import (
 )
 
 func main() {
+	stop := make(chan struct{})
+	metricsChan := make(chan []metricModel.Metric)
+	gopsutilMetricsChan := make(chan []metricModel.Metric)
+
+	go collectMetricsRoutine(metricsChan, stop)
+	go collectGopsutilMetricsRoutine(gopsutilMetricsChan, stop)
+	go prepareMetricsRoutine(metricsChan, gopsutilMetricsChan, stop)
+
+	<-stop
+}
+func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
+	gopsutilInterval := 5 * time.Second
+
+	ticker := time.NewTicker(gopsutilInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			gopsutilMetrics := collectGopsutilMetrics()
+			gopsutilMetricsChan <- gopsutilMetrics
+		}
+	}
+}
+
+func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
 	cfg := config.LoadAgent()
 	updateInterval := time.Duration(cfg.FlagRuntime) * time.Second
-	sendInterval := time.Duration(cfg.FlagReportInterval) * time.Second
-
 	lastUpdateTime := time.Now()
-	lastSendTime := time.Now()
-
 	PollCount := int64(1)
 
-	var metrics []metricModel.Metric
 	for {
-		// Обновляем метрики каждые 2 секунды
-		if time.Since(lastUpdateTime) > updateInterval {
-			metrics = collectMetrics(PollCount)
-			PollCount++
-			lastUpdateTime = time.Now()
+		select {
+		case <-stop:
+			return
+		default:
+			if time.Since(lastUpdateTime) > updateInterval {
+				metrics := collectMetrics(PollCount)
+				PollCount++
+				lastUpdateTime = time.Now()
+				metricsChan <- metrics
+			}
 		}
+	}
+}
 
-		// Отправляем метрики каждые 10 секунд
-		if time.Since(lastSendTime) > sendInterval && len(metrics) > 0 {
-			sendMetricsButch(metrics)
-			lastSendTime = time.Now()
+func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <-chan []metricModel.Metric, stop <-chan struct{}) {
+	cfg := config.LoadAgent()
+	rateLimit := cfg.RateLimit
+	sendInterval := time.Duration(cfg.FlagReportInterval) * time.Second
+
+	mergedMetricsChan := mergeMetrics(metricsChan, gopsutilMetricsChan)
+
+	lastSendTime := time.Now()
+	jobChan := make(chan metricModel.Metric, rateLimit)
+
+	//pool worker
+	for i := 0; i < rateLimit; i++ {
+		go sendMetricsRoutine(jobChan, stop)
+	}
+
+	for {
+		select {
+		case <-stop:
+			close(jobChan)
+			return
+		default:
+			if time.Since(lastSendTime) > sendInterval {
+				for metrics := range mergedMetricsChan {
+					for _, m := range metrics {
+						jobChan <- m
+					}
+				}
+				lastSendTime = time.Now()
+			}
+		}
+	}
+}
+
+func mergeMetrics(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <-chan []metricModel.Metric) <-chan []metricModel.Metric {
+	mergedChan := make(chan []metricModel.Metric)
+
+	go func() {
+		defer close(mergedChan)
+
+		for {
+			select {
+			case metrics, ok := <-metricsChan:
+				if !ok {
+					metricsChan = nil
+					continue
+				}
+				mergedChan <- metrics
+			case gopsutilMetrics, ok := <-gopsutilMetricsChan:
+				if !ok {
+					gopsutilMetricsChan = nil
+					continue
+				}
+				mergedChan <- gopsutilMetrics
+			default:
+				if metricsChan == nil && gopsutilMetricsChan == nil {
+					return
+				}
+			}
+		}
+	}()
+
+	return mergedChan
+}
+
+func sendMetricsRoutine(jobChan <-chan metricModel.Metric, stop <-chan struct{}) {
+	for {
+		select {
+		case <-stop:
+			return
+		case metric := <-jobChan:
+			sendMetricsButch([]metricModel.Metric{metric})
 		}
 	}
 }
@@ -49,6 +149,26 @@ func collectMetrics(PollCount int64) []metricModel.Metric {
 
 	// счетчик PollCount
 	metrics = append(metrics, collectPollCount(PollCount)...)
+
+	return metrics
+}
+
+func collectGopsutilMetrics() []metricModel.Metric {
+	var metrics []metricModel.Metric
+
+	virtualMemoryStat, err := mem.VirtualMemory()
+	if err == nil {
+		metrics = append(metrics, createMetricFromUint64("TotalMemory", metricModel.MetricTypeGauge, virtualMemoryStat.Total))
+		metrics = append(metrics, createMetricFromUint64("FreeMemory", metricModel.MetricTypeGauge, virtualMemoryStat.Free))
+	}
+
+	cpuPercentages, err := cpu.Percent(time.Second, false)
+	if err == nil {
+		for i, cpuUsage := range cpuPercentages {
+			metricName := fmt.Sprintf("CPUutilization%d", i+1)
+			metrics = append(metrics, createMetricFromFloat64(metricName, metricModel.MetricTypeGauge, cpuUsage))
+		}
+	}
 
 	return metrics
 }
@@ -159,6 +279,11 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if err != nil {
 		log.Println("Error when created request data:", err.Error())
+	}
+
+	hashAgent := hash.CalculateHashAgent(b)
+	if hashAgent != "" {
+		req.Header.Add("HashSHA256", hashAgent)
 	}
 
 	req.Header.Add("Content-Type", "application/json")
