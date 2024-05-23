@@ -16,6 +16,7 @@ import (
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
+	echopprof "github.com/hiko1129/echo-pprof"
 	"github.com/labstack/echo/v4"
 	"log"
 	"net/http"
@@ -370,6 +371,7 @@ func main() {
 	go files.UpdateMetrics()
 
 	fmt.Println("Running server on", cfg.FlagRunAddr)
+	echopprof.Wrap(e)
 	err := e.Start(cfg.FlagRunAddr)
 	if err != nil {
 		panic(err)
