@@ -7,6 +7,10 @@ go tool pprof -http="172.20.255.21:8081" -seconds=30 http://172.20.255.21:8080/d
 БД
 psql -U postgres -d metrics - коннект
 
+go install -v golang.org/x/tools/cmd/godoc@latest
+godoc -http=:6060
+
+
 запуск тестов:
 ./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
 ./metricstest -test.v -test.run=^TestIteration7 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080

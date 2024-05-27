@@ -24,6 +24,7 @@ import (
 )
 
 // TODO вынести в отдельную директорию api
+// AddMetric - Ендпоинт для добавления метрики
 func AddMetric(c echo.Context) error {
 	typeMetric := c.Param("type_metric")
 	nameMetric := c.Param("name_metric")
