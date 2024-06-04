@@ -16,6 +16,7 @@ type Migrator struct {
 	migrate *migrate.Migrate
 }
 
+// NewMigrator создает новый объект Migrator для управления миграциями базы данных.
 func NewMigrator() (*Migrator, error) {
 	var err error
 
@@ -41,6 +42,7 @@ func newMigrator() (*Migrator, error) {
 	return &Migrator{migrate: m}, nil
 }
 
+// Up применяет миграции базы данных.
 func (m *Migrator) Up() error {
 	if err := m.migrate.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {

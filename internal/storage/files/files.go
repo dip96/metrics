@@ -106,6 +106,7 @@ func SaveMetrics(producer ioModel.ProducerInterface) {
 	}
 }
 
+// InitMetrics инициализирует метрики из файлового хранилища.
 func InitMetrics() {
 	cfg := config.LoadServer()
 	Consumer, err := NewConsumer(cfg.FileStoragePath)
@@ -136,6 +137,7 @@ func InitMetrics() {
 	}
 }
 
+// UpdateMetrics обновляет метрики в файловом хранилище в бесконечном цикле.
 func UpdateMetrics() error {
 	cfg := config.LoadServer()
 	ticker := time.NewTicker(time.Duration(cfg.StoreInterval) * time.Second)
