@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/dip96/metrics/internal/model/metric"
+	"bytes"
+	"encoding/json"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/storage"
 	"github.com/labstack/echo/v4"
@@ -48,9 +49,9 @@ func TestGetMetric(t *testing.T) {
 	e.GET("/value/:name_metric", getMetric)
 
 	// Добавляем тестовую метрику
-	metric := metric.Metric{
+	metric := metricModel.Metric{
 		ID:             "test_metric",
-		MType:          metric.MetricTypeGauge,
+		MType:          metricModel.MetricTypeGauge,
 		Value:          Float64Ptr(42.0),
 		FullValueGauge: "42",
 		Delta:          nil,
@@ -80,15 +81,15 @@ func TestGetAllMetrics(t *testing.T) {
 	e.GET("/", getAllMetrics)
 
 	// Добавляем тестовые метрики
-	metric1 := metric.Metric{
+	metric1 := metricModel.Metric{
 		ID:    "test_metric_1",
-		MType: metric.MetricTypeGauge,
+		MType: metricModel.MetricTypeGauge,
 		Value: Float64Ptr(42.0),
 		Delta: nil,
 	}
-	metric2 := metric.Metric{
+	metric2 := metricModel.Metric{
 		ID:    "test_metric_2",
-		MType: metric.MetricTypeCounter,
+		MType: metricModel.MetricTypeCounter,
 		Value: nil,
 		Delta: Int64Ptr(100),
 	}
@@ -112,6 +113,74 @@ func TestGetAllMetrics(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "test_metric_1: 42")
 	assert.Contains(t, string(body), "test_metric_2: 100")
+}
+
+func TestAddMetricV2(t *testing.T) {
+	// Создаем новый экземпляр Echo
+	e := echo.New()
+
+	// Очищаем хранилище перед каждым тестом
+	storage.Storage.Clear()
+
+	t.Run("add gauge metric", func(t *testing.T) {
+		gaugeMetric := metricModel.Metric{
+			ID:    "GaugeMetric",
+			MType: metricModel.MetricTypeGauge,
+			Value: Float64Ptr(42.0),
+			Delta: nil,
+		}
+
+		body, err := json.Marshal(gaugeMetric)
+		require.NoError(t, err)
+
+		e.POST("/update/", AddMetricV2)
+		req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+
+		// Вызываем хендлер
+		e.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		resp := metricModel.Metric{}
+		err = json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		require.NoError(t, err)
+
+		assert.Equal(t, gaugeMetric.ID, resp.ID)
+		assert.Equal(t, gaugeMetric.MType, resp.MType)
+		assert.Equal(t, *gaugeMetric.Value, *resp.Value)
+		assert.Nil(t, resp.Delta)
+	})
+
+	t.Run("add counter metric", func(t *testing.T) {
+		counterMetric := metricModel.Metric{
+			ID:    "CounterMetric",
+			MType: metricModel.MetricTypeCounter,
+			Value: nil,
+			Delta: Int64Ptr(10),
+		}
+
+		body, err := json.Marshal(counterMetric)
+		require.NoError(t, err)
+
+		e.POST("/update/", AddMetricV2)
+		req := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(body))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		rec := httptest.NewRecorder()
+
+		// Вызываем хендлер
+		e.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		resp := metricModel.Metric{}
+		err = json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, counterMetric, resp)
+	})
 }
 
 // Вспомогательная функция для создания указателя на float64

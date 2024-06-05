@@ -10,6 +10,9 @@ psql -U postgres -d metrics - коннект
 go install -v golang.org/x/tools/cmd/godoc@latest
 godoc -http=:6060
 
+test
+go test -coverprofile=coverage.out ./... ;    go tool cover -func=coverage.out
+go test -coverprofile coverage.out ./... -coverpkg ./...
 
 запуск тестов:
 ./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
