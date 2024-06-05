@@ -203,7 +203,7 @@ func AddMetricV2(c echo.Context) error {
 	if hashServer != "" {
 		c.Response().Header().Set("HashSHA256", hashServer)
 	}
-	return c.JSON(http.StatusOK, jsonData)
+	return c.JSON(http.StatusOK, metric)
 }
 
 // GetMetricV2 - Эндпоинт для получения метрики по ее имени в формате JSON.

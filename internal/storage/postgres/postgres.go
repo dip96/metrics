@@ -150,6 +150,10 @@ func (d *DB) GetAll() (map[string]metricModel.Metric, error) {
 	return metrics, nil
 }
 
+func (d *DB) Clear() error {
+	return nil
+}
+
 // Ping проверяет соединение с базой данных PostgreSQL.
 func (d *DB) Ping() error {
 	pingCtx := context.Background()
