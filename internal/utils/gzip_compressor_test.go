@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"github.com/dip96/metrics/internal/utils"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ func TestGzipCompress(t *testing.T) {
 		require.NoError(t, err)
 		defer r.Close()
 
-		decompressed, err := ioutil.ReadAll(r)
+		decompressed, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		// Проверяем, что распакованные данные соответствуют исходным
@@ -51,7 +51,7 @@ func TestGzipCompress(t *testing.T) {
 		require.NoError(t, err)
 		defer r.Close()
 
-		decompressed, err := ioutil.ReadAll(r)
+		decompressed, err := io.ReadAll(r)
 		require.NoError(t, err)
 
 		// Проверяем, что распакованные данные пустые
