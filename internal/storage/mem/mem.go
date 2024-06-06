@@ -40,6 +40,11 @@ func (m *Storage) SetAll(metrics map[string]metric.Metric) error {
 	return nil
 }
 
+func (m *Storage) Clear() error {
+	m.metrics = make(map[string]metric.Metric)
+	return nil
+}
+
 // NewStorage - конструктор для создания нового экземпляра Storage
 func NewStorage() *Storage {
 	return &Storage{

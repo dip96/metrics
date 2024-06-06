@@ -28,6 +28,9 @@ func main() {
 
 	<-stop
 }
+
+// collectGopsutilMetricsRoutine - горутина для сбора метрик из gopsutil.
+// Метрики помещаются в канал gopsutilMetricsChan с интервалом gopsutilInterval.
 func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
 	gopsutilInterval := 5 * time.Second
 
@@ -45,6 +48,8 @@ func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metr
 	}
 }
 
+// collectMetricsRoutine - горутина для сбора метрик из runtime.
+// Метрики помещаются в канал metricsChan с интервалом updateInterval.
 func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
 	cfg := config.LoadAgent()
 	updateInterval := time.Duration(cfg.FlagRuntime) * time.Second
@@ -66,6 +71,9 @@ func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan 
 	}
 }
 
+// prepareMetricsRoutine - горутина для обработки и отправки метрик.
+// Метрики из каналов metricsChan и gopsutilMetricsChan объединяются и отправляются с интервалом sendInterval.
+// Для отправки метрик используется пул воркеров с размером rateLimit.
 func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <-chan []metricModel.Metric, stop <-chan struct{}) {
 	cfg := config.LoadAgent()
 	rateLimit := cfg.RateLimit
@@ -99,6 +107,8 @@ func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetr
 	}
 }
 
+// mergeMetrics - функция для объединения метрик из двух каналов.
+// Возвращает канал, в который помещаются объединенные метрики.
 func mergeMetrics(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <-chan []metricModel.Metric) <-chan []metricModel.Metric {
 	mergedChan := make(chan []metricModel.Metric)
 
@@ -130,6 +140,8 @@ func mergeMetrics(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <
 	return mergedChan
 }
 
+// sendMetricsRoutine - горутина для отправки метрик.
+// Метрики принимаются из канала jobChan и отправляются на сервер.
 func sendMetricsRoutine(jobChan <-chan metricModel.Metric, stop <-chan struct{}) {
 	for {
 		select {
@@ -141,6 +153,8 @@ func sendMetricsRoutine(jobChan <-chan metricModel.Metric, stop <-chan struct{})
 	}
 }
 
+// collectMetrics - функция для сбора метрик из runtime.
+// Возвращает срез метрик, включая счетчик PollCount.
 func collectMetrics(PollCount int64) []metricModel.Metric {
 	var metrics []metricModel.Metric
 
@@ -153,6 +167,8 @@ func collectMetrics(PollCount int64) []metricModel.Metric {
 	return metrics
 }
 
+// collectGopsutilMetrics - функция для сбора метрик из gopsutil.
+// Возвращает срез метрик, включая данные о памяти и использовании CPU.
 func collectGopsutilMetrics() []metricModel.Metric {
 	var metrics []metricModel.Metric
 
@@ -173,6 +189,7 @@ func collectGopsutilMetrics() []metricModel.Metric {
 	return metrics
 }
 
+// collectRuntimeGauges - функция для сбора метрик gauge
 func collectRuntimeGauges() []metricModel.Metric {
 	var gauges []metricModel.Metric
 

@@ -16,13 +16,16 @@ import (
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
+	echopprof "github.com/hiko1129/echo-pprof"
 	"github.com/labstack/echo/v4"
 	"log"
 	"net/http"
 	"strconv"
 )
 
-// TODO вынести в отдельную директорию api
+// AddMetric - Ендпоинт для добавления метрики.
+// Принимает тип метрики (gauge или counter), имя метрики и значение.
+// Возвращает статус-код 200 в случае успешного добавления, иначе - 400.
 func AddMetric(c echo.Context) error {
 	typeMetric := c.Param("type_metric")
 	nameMetric := c.Param("name_metric")
@@ -66,6 +69,10 @@ func AddMetric(c echo.Context) error {
 	return c.String(http.StatusOK, "")
 }
 
+// getMetric - Эндпоинт для получения значения метрики по ее имени.
+// Принимает имя метрики.
+// Возвращает значение метрики в виде строки и статус-код 200,
+// или сообщение об ошибке и статус-код 404 в случае, если метрика не найдена.
 func getMetric(c echo.Context) error {
 	name := c.Param("name_metric")
 	metric, err := storage.Storage.Get(name)
@@ -83,6 +90,8 @@ func getMetric(c echo.Context) error {
 	return c.String(http.StatusOK, value)
 }
 
+// getAllMetrics - Эндпоинт для получения списка всех метрик в HTML-формате.
+// Возвращает HTML-страницу со списком метрик и их значений и статус-код 200.
 func getAllMetrics(c echo.Context) error {
 	metrics, err := storage.Storage.GetAll()
 
@@ -123,6 +132,10 @@ func getAllMetrics(c echo.Context) error {
 	return c.HTML(http.StatusOK, buf.String())
 }
 
+// AddMetricV2 - Эндпоинт для добавления метрики в формате JSON.
+// Принимает структуру Metric в теле запроса.
+// Возвращает добавленную метрику в формате JSON и статус-код 200 в случае успеха,
+// иначе - сообщение об ошибке и статус-код 400.
 func AddMetricV2(c echo.Context) error {
 	body := new(metricModel.Metric)
 
@@ -190,9 +203,13 @@ func AddMetricV2(c echo.Context) error {
 	if hashServer != "" {
 		c.Response().Header().Set("HashSHA256", hashServer)
 	}
-	return c.JSON(http.StatusOK, jsonData)
+	return c.JSON(http.StatusOK, metric)
 }
 
+// GetMetricV2 - Эндпоинт для получения метрики по ее имени в формате JSON.
+// Принимает структуру Metric с заполненным полем ID в теле запроса.
+// Возвращает метрику в формате JSON и статус-код 200 в случае успеха,
+// иначе - сообщение об ошибке и статус-код 404 или 400.
 func GetMetricV2(c echo.Context) error {
 	body := new(metricModel.Metric)
 
@@ -239,6 +256,10 @@ func GetMetricV2(c echo.Context) error {
 	return c.JSON(http.StatusOK, jsonData)
 }
 
+// ping - Функция для проверки соединения с базой данных PostgreSQL.
+// Принимает контекст Echo и экземпляр подключения к базе данных.
+// Возвращает статус-код 200 в случае успешного соединения,
+// иначе - статус-код 500.
 func ping(c echo.Context, db *postgresStorage.DB) error {
 	if err := db.Ping(); err != nil {
 		return c.String(http.StatusInternalServerError, "")
@@ -247,6 +268,10 @@ func ping(c echo.Context, db *postgresStorage.DB) error {
 	return c.String(http.StatusOK, "")
 }
 
+// AddMetrics - Эндпоинт для добавления нескольких метрик в формате JSON.
+// Принимает срез структур Metric в теле запроса.
+// Возвращает добавленные метрики в формате JSON и статус-код 200 в случае успеха,
+// иначе - сообщение об ошибке и статус-код 400.
 func AddMetrics(c echo.Context) error {
 	var metrics []metricModel.Metric
 
@@ -370,6 +395,7 @@ func main() {
 	go files.UpdateMetrics()
 
 	fmt.Println("Running server on", cfg.FlagRunAddr)
+	echopprof.Wrap(e)
 	err := e.Start(cfg.FlagRunAddr)
 	if err != nil {
 		panic(err)

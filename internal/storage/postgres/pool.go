@@ -61,6 +61,7 @@ func (pw *PoolWrapper) Exec(ctx context.Context, sql string, arguments ...any) (
 	return pgconn.CommandTag{}, nil
 }
 
+// Ping проверяет соединение с базой данных PostgreSQL.
 func (pw *PoolWrapper) Ping(ctx context.Context) error {
 	//TODO вынести в отдельный метод логику повторным запросам
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
@@ -101,6 +102,7 @@ func (pw *PoolWrapper) Begin(ctx context.Context) (pgx.Tx, error) {
 	return nil, nil
 }
 
+// Close закрывает пул подключений к базе данных PostgreSQL.
 func (pw *PoolWrapper) Close() {
 	pw.pool.Close()
 }

@@ -12,6 +12,7 @@ type DB struct {
 	Pool *PoolWrapper
 }
 
+// NewDB создает новое подключение к базе данных PostgreSQL.
 func NewDB() (*DB, error) {
 	cnf := config.LoadServer()
 	pool, err := pgxpool.New(context.Background(), cnf.DatabaseDsn)
@@ -149,6 +150,11 @@ func (d *DB) GetAll() (map[string]metricModel.Metric, error) {
 	return metrics, nil
 }
 
+func (d *DB) Clear() error {
+	return nil
+}
+
+// Ping проверяет соединение с базой данных PostgreSQL.
 func (d *DB) Ping() error {
 	pingCtx := context.Background()
 
