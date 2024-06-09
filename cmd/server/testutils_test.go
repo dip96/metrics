@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"github.com/dip96/metrics/internal/storage"
 	"github.com/dip96/metrics/internal/storage/mem"
-	"os"
 	"testing"
 )
 
@@ -15,7 +15,8 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	// Выходим с кодом возврата
-	os.Exit(code)
+	//os.Exit(code)
+	fmt.Print(code)
 }
 
 func initStorage() {
