@@ -112,6 +112,35 @@ func (m *MockProducer) Close() error {
 	return nil
 }
 
+// MockConfig is a mock for the configuration
+type MockConfig struct {
+	DirStorageTmpPath string
+}
+
+// LoadServer mock implementation
+func LoadServer() *MockConfig {
+	return &MockConfig{
+		DirStorageTmpPath: os.TempDir(),
+	}
+}
+
+func TestInitTmpProducer(t *testing.T) {
+	producer := initTmpProducer()
+
+	// Check if the file was created in the correct directory
+	cfg := LoadServer()
+	assert.Contains(t, producer.file.Name(), cfg.DirStorageTmpPath)
+
+	// Check if the file can be written to
+	testData := []byte("test data")
+	_, err := producer.writer.Write(testData)
+	assert.NoError(t, err)
+
+	// Check if the buffer can be flushed to the file
+	err = producer.writer.Flush()
+	assert.NoError(t, err)
+}
+
 // Вспомогательная функция для создания указателя на float64
 func Float64Ptr(f float64) *float64 {
 	return &f

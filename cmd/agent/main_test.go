@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCollectMetrics(t *testing.T) {
@@ -161,6 +162,83 @@ func TestCreateMetricFromUint32(t *testing.T) {
 	assert.Equal(t, name, m.ID)
 	assert.Equal(t, metric.MetricTypeGauge, m.MType)
 	assert.Equal(t, float64(value), *m.Value)
+}
+
+// MetricsSender интерфейс для отправки метрик.
+type MetricsSender interface {
+	send(metrics []metric.Metric)
+}
+
+func TestSendMetricsRoutine(t *testing.T) {
+	//TODO доработать
+	jobChan := make(chan metric.Metric, 1)
+	stop := make(chan struct{})
+	//sender := &fakeMetricsSender{}
+
+	go sendMetricsRoutine(jobChan, stop)
+
+	jobChan <- metric.Metric{
+		ID:    "test_metric",
+		MType: metric.MetricTypeGauge,
+		Value: Float64Ptr(10.5),
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	close(stop)
+
+	//assert.True(t, sender, "sendMetricsButch should have been called")
+}
+func TestCollectMetricsRoutine(t *testing.T) {
+	metricsChan := make(chan []metric.Metric, 1)
+	stop := make(chan struct{})
+
+	go collectMetricsRoutine(metricsChan, stop)
+
+	select {
+	case metrics := <-metricsChan:
+		assert.NotEmpty(t, metrics)
+	case <-time.After(2 * time.Second): // Slightly more than the 1-second interval
+		t.Fatal("Expected metrics, but got timeout")
+	}
+
+	close(stop)
+}
+
+func TestCollectGopsutilMetricsRoutine_Stop(t *testing.T) {
+	gopsutilMetricsChan := make(chan []metric.Metric, 1)
+	stop := make(chan struct{})
+
+	go collectGopsutilMetricsRoutine(gopsutilMetricsChan, stop)
+	close(stop)
+
+	time.Sleep(6 * time.Second)
+
+	select {
+	case <-gopsutilMetricsChan:
+		t.Fatal("Expected no metrics, but received some")
+	default:
+	}
+}
+
+func TestGetOrDefault(t *testing.T) {
+	tests := []struct {
+		value        string
+		defaultValue string
+		expected     string
+	}{
+		{"value", "default", "value"},
+		{"", "default", "default"},
+		{"value", "", "value"},
+		{"", "", ""},
+	}
+
+	for _, test := range tests {
+		result := getOrDefault(test.value, test.defaultValue)
+		if result != test.expected {
+			t.Errorf("getOrDefault(%q, %q) = %q; want %q", test.value, test.defaultValue, result, test.expected)
+		}
+	}
 }
 
 // Вспомогательная функция для создания указателя на float64
