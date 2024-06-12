@@ -23,6 +23,12 @@ import (
 	"strconv"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 // AddMetric - Ендпоинт для добавления метрики.
 // Принимает тип метрики (gauge или counter), имя метрики и значение.
 // Возвращает статус-код 200 в случае успешного добавления, иначе - 400.
@@ -348,6 +354,7 @@ func AddMetrics(c echo.Context) error {
 }
 
 func main() {
+	printBuildInfo()
 	cfg := config.LoadServer()
 
 	e := echo.New()
@@ -400,4 +407,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func printBuildInfo() {
+	fmt.Printf("Build version: %s\n", getOrDefault(buildVersion, "N/A"))
+	fmt.Printf("Build date: %s\n", getOrDefault(buildDate, "N/A"))
+	fmt.Printf("Build commit: %s\n", getOrDefault(buildCommit, "N/A"))
+}
+
+func getOrDefault(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }

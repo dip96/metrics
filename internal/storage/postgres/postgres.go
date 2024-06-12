@@ -151,6 +151,21 @@ func (d *DB) GetAll() (map[string]metricModel.Metric, error) {
 }
 
 func (d *DB) Clear() error {
+	err := d.Ping()
+	if err != nil {
+		return err
+	}
+
+	sql := "TRUNCATE TABLE metrics"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = d.Pool.Exec(ctx, sql)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

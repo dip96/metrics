@@ -17,7 +17,14 @@ import (
 	"time"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	printBuildInfo()
 	stop := make(chan struct{})
 	metricsChan := make(chan []metricModel.Metric)
 	gopsutilMetricsChan := make(chan []metricModel.Metric)
@@ -27,6 +34,19 @@ func main() {
 	go prepareMetricsRoutine(metricsChan, gopsutilMetricsChan, stop)
 
 	<-stop
+}
+
+func printBuildInfo() {
+	fmt.Printf("Build version: %s\n", getOrDefault(buildVersion, "N/A"))
+	fmt.Printf("Build date: %s\n", getOrDefault(buildDate, "N/A"))
+	fmt.Printf("Build commit: %s\n", getOrDefault(buildCommit, "N/A"))
+}
+
+func getOrDefault(value, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }
 
 // collectGopsutilMetricsRoutine - горутина для сбора метрик из gopsutil.

@@ -1,3 +1,4 @@
+# shellcheck disable=SC2164
 cd ./cmd/server
 rm -rf server
 go build -o server *.go
