@@ -200,6 +200,8 @@ func TestPing(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	db, err := postgresStorage.NewDB()
+	assert.NoError(t, err)
+
 	err = ping(e.NewContext(req, rec), db)
 	assert.NoError(t, err)
 
