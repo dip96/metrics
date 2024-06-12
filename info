@@ -14,6 +14,9 @@ test
 go test -coverprofile=coverage.out ./... ;    go tool cover -func=coverage.out
 go test -coverprofile coverage.out ./... -coverpkg ./...
 
+multichecker
+go run ./cmd/multichecker ./...
+
 запуск тестов:
 ./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
 ./metricstest -test.v -test.run=^TestIteration7 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
