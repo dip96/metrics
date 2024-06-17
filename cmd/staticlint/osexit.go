@@ -28,7 +28,7 @@ var Analyzer = &analysis.Analyzer{
 }
 
 // run - это основная функция анализатора noosexit. Она принимает analysis.Pass
-// и возвращает результат анализа
+// и возвращает результат анализа.
 //
 // Алгоритм работы:
 //  1. Получает инспектор AST из результатов анализатора inspect.
@@ -60,22 +60,37 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	inspect.Preorder(nodeFilter, func(n ast.Node) {
-		switch n := n.(type) {
-		case *ast.FuncDecl:
-			if n.Name.Name == "main" && pass.Pkg.Name() == "main" {
-				ast.Inspect(n, func(node ast.Node) bool {
-					if call, ok := node.(*ast.CallExpr); ok {
-						if fun, ok := call.Fun.(*ast.SelectorExpr); ok {
-							if x, ok := fun.X.(*ast.Ident); ok && x.Name == "os" && fun.Sel.Name == "Exit" {
-								pass.Reportf(call.Pos(), "прямой вызов os.Exit в функции main запрещен")
-							}
-						}
-					}
-					return true
-				})
-			}
+		funcDecl, ok := n.(*ast.FuncDecl)
+		if !ok {
+			return
+		}
+
+		if isMainFunc(funcDecl, pass.Pkg.Name()) {
+			ast.Inspect(funcDecl, func(node ast.Node) bool {
+				if call, ok := node.(*ast.CallExpr); ok && isOsExitCall(call) {
+					pass.Reportf(call.Pos(), "прямой вызов os.Exit в функции main запрещен")
+				}
+				return true
+			})
 		}
 	})
 
 	return nil, nil
+}
+
+// isMainFunc проверяет, является ли переданная ast.FuncDecl функцией main
+// в пакете main.
+func isMainFunc(n *ast.FuncDecl, pkgName string) bool {
+	return n.Name.Name == "main" && pkgName == "main"
+}
+
+// isOsExitCall проверяет, является ли переданный ast.CallExpr вызовом
+// функции os.Exit.
+func isOsExitCall(call *ast.CallExpr) bool {
+	if fun, ok := call.Fun.(*ast.SelectorExpr); ok {
+		if x, ok := fun.X.(*ast.Ident); ok && x.Name == "os" && fun.Sel.Name == "Exit" {
+			return true
+		}
+	}
+	return false
 }
