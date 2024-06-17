@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/storage"
+	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -181,6 +182,50 @@ func TestAddMetricV2(t *testing.T) {
 
 		assert.Equal(t, counterMetric, resp)
 	})
+}
+
+// Mock DB object
+type mockDB struct{}
+
+func (m *mockDB) Ping() error {
+	// Simulate successful ping
+	return nil
+}
+
+func TestPing(t *testing.T) {
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	rec := httptest.NewRecorder()
+
+	db, err := postgresStorage.NewDB()
+	assert.NoError(t, err)
+
+	err = ping(e.NewContext(req, rec), db)
+	assert.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestGetOrDefault(t *testing.T) {
+	tests := []struct {
+		value        string
+		defaultValue string
+		expected     string
+	}{
+		{"value", "default", "value"},
+		{"", "default", "default"},
+		{"value", "", "value"},
+		{"", "", ""},
+	}
+
+	for _, test := range tests {
+		result := test.value
+		if result != test.expected {
+			t.Errorf("getOrDefault(%q, %q) = %q; want %q", test.value, test.defaultValue, result, test.expected)
+		}
+	}
 }
 
 // Вспомогательная функция для создания указателя на float64

@@ -20,7 +20,14 @@ import (
 	"github.com/labstack/echo/v4"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+)
+
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
 )
 
 // AddMetric - Ендпоинт для добавления метрики.
@@ -348,6 +355,7 @@ func AddMetrics(c echo.Context) error {
 }
 
 func main() {
+	printBuildInfo()
 	cfg := config.LoadServer()
 
 	e := echo.New()
@@ -394,10 +402,17 @@ func main() {
 	files.InitMetrics()
 	go files.UpdateMetrics()
 
+	os.Exit(1)
 	fmt.Println("Running server on", cfg.FlagRunAddr)
 	echopprof.Wrap(e)
 	err := e.Start(cfg.FlagRunAddr)
 	if err != nil {
 		panic(err)
 	}
+}
+
+func printBuildInfo() {
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 }
