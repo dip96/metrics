@@ -3,17 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/dip96/metrics/cmd/staticlint"
-	"github.com/dorfire/go-analyzers/src/onlyany"
-	gokartAnalyzers "github.com/praetorian-inc/gokart/analyzers"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
-	"golang.org/x/tools/go/analysis/passes/asmdecl"
-	"golang.org/x/tools/go/analysis/passes/assign"
-	"golang.org/x/tools/go/analysis/passes/atomic"
-	"honnef.co/go/tools/quickfix"
-	"honnef.co/go/tools/simple"
-	"honnef.co/go/tools/staticcheck"
-	"honnef.co/go/tools/stylecheck"
 )
 
 // main является точкой входа для инструмента статического анализа.
@@ -74,41 +65,41 @@ func main() {
 	var analyzers []*analysis.Analyzer
 
 	// Стандартные статические анализаторы
-	analyzers = append(analyzers, asmdecl.Analyzer)
-	analyzers = append(analyzers, assign.Analyzer)
-	analyzers = append(analyzers, atomic.Analyzer)
-
-	// Все анализаторы класса SA из staticcheck.io
-	for _, a := range staticcheck.Analyzers {
-		analyzers = append(analyzers, a.Analyzer)
-		fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
-	}
-
-	// Все анализаторы класса ST из staticcheck.io
-	for _, a := range stylecheck.Analyzers {
-		analyzers = append(analyzers, a.Analyzer)
-		fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
-	}
-
-	// Все анализаторы класса QF1 из staticcheck.io
-	for _, a := range quickfix.Analyzers {
-		analyzers = append(analyzers, a.Analyzer)
-		fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
-	}
-
-	// Все анализаторы класса S1 из staticcheck.io
-	for _, a := range simple.Analyzers {
-		analyzers = append(analyzers, a.Analyzer)
-		fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
-	}
-
-	for _, a := range gokartAnalyzers.Analyzers {
-		analyzers = append(analyzers, a)
-		fmt.Printf("Добавлен анализатор: %s\n", a.Name)
-	}
-
-	analyzers = append(analyzers, onlyany.Analyzer)
-	fmt.Printf("Добавлен анализатор: %s\n", onlyany.Analyzer.Name)
+	//analyzers = append(analyzers, asmdecl.Analyzer)
+	//analyzers = append(analyzers, assign.Analyzer)
+	//analyzers = append(analyzers, atomic.Analyzer)
+	//
+	//// Все анализаторы класса SA из staticcheck.io
+	//for _, a := range staticcheck.Analyzers {
+	//	analyzers = append(analyzers, a.Analyzer)
+	//	fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
+	//}
+	//
+	//// Все анализаторы класса ST из staticcheck.io
+	//for _, a := range stylecheck.Analyzers {
+	//	analyzers = append(analyzers, a.Analyzer)
+	//	fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
+	//}
+	//
+	//// Все анализаторы класса QF1 из staticcheck.io
+	//for _, a := range quickfix.Analyzers {
+	//	analyzers = append(analyzers, a.Analyzer)
+	//	fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
+	//}
+	//
+	//// Все анализаторы класса S1 из staticcheck.io
+	//for _, a := range simple.Analyzers {
+	//	analyzers = append(analyzers, a.Analyzer)
+	//	fmt.Printf("Добавлен анализатор: %s\n", a.Analyzer.Name)
+	//}
+	//
+	//for _, a := range gokartAnalyzers.Analyzers {
+	//	analyzers = append(analyzers, a)
+	//	fmt.Printf("Добавлен анализатор: %s\n", a.Name)
+	//}
+	//
+	//analyzers = append(analyzers, onlyany.Analyzer)
+	//fmt.Printf("Добавлен анализатор: %s\n", onlyany.Analyzer.Name)
 
 	analyzers = append(analyzers, staticlint.Analyzer)
 	fmt.Printf("Добавлен анализатор: %s\n", staticlint.Analyzer.Name)

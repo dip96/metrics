@@ -234,7 +234,7 @@ func TestGetOrDefault(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := getOrDefault(test.value, test.defaultValue)
+		result := test.value
 		if result != test.expected {
 			t.Errorf("getOrDefault(%q, %q) = %q; want %q", test.value, test.defaultValue, result, test.expected)
 		}

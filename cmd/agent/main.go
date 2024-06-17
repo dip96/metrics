@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	buildVersion string
-	buildDate    string
-	buildCommit  string
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
 )
 
 func main() {
@@ -37,16 +37,9 @@ func main() {
 }
 
 func printBuildInfo() {
-	fmt.Printf("Build version: %s\n", getOrDefault(buildVersion, "N/A"))
-	fmt.Printf("Build date: %s\n", getOrDefault(buildDate, "N/A"))
-	fmt.Printf("Build commit: %s\n", getOrDefault(buildCommit, "N/A"))
-}
-
-func getOrDefault(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-	return value
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 }
 
 // collectGopsutilMetricsRoutine - горутина для сбора метрик из gopsutil.
