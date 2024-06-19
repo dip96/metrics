@@ -3,7 +3,6 @@ package generate
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +12,7 @@ import (
 
 func TestGenerate(t *testing.T) {
 	// Создаем временные файлы для хранения ключей
-	tempDir, err := ioutil.TempDir("", "test-keys")
+	tempDir, err := os.MkdirTemp("", "test-keys")
 	if err != nil {
 		t.Fatalf("Failed to create temporary directory: %v", err)
 	}
@@ -44,7 +43,7 @@ func TestGenerate(t *testing.T) {
 	}
 
 	// Проверяем, что содержимое файлов соответствует ожидаемому формату
-	privateKeyData, err := ioutil.ReadFile(privateKeyPath)
+	privateKeyData, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		t.Errorf("Failed to read private key file: %v", err)
 	}
@@ -54,12 +53,17 @@ func TestGenerate(t *testing.T) {
 		t.Error("Failed to decode PEM block containing private key")
 	}
 
+	if block.Bytes == nil {
+		t.Errorf("block.Bytes is nil")
+		return
+	}
+
 	_, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		t.Errorf("Failed to parse private key: %v", err)
 	}
 
-	publicKeyData, err := ioutil.ReadFile(publicKeyPath)
+	publicKeyData, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Errorf("Failed to read public key file: %v", err)
 	}
@@ -67,6 +71,11 @@ func TestGenerate(t *testing.T) {
 	block, _ = pem.Decode(publicKeyData)
 	if block == nil {
 		t.Error("Failed to decode PEM block containing public key")
+	}
+
+	if block.Bytes == nil {
+		t.Errorf("block.Bytes is nil")
+		return
 	}
 
 	_, err = x509.ParsePKIXPublicKey(block.Bytes)
