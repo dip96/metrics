@@ -221,26 +221,6 @@ func TestCollectGopsutilMetricsRoutine_Stop(t *testing.T) {
 	}
 }
 
-func TestGetOrDefault(t *testing.T) {
-	tests := []struct {
-		value        string
-		defaultValue string
-		expected     string
-	}{
-		{"value", "default", "value"},
-		{"", "default", "default"},
-		{"value", "", "value"},
-		{"", "", ""},
-	}
-
-	for _, test := range tests {
-		result := test.value
-		if result != test.expected {
-			t.Errorf("getOrDefault(%q, %q) = %q; want %q", test.value, test.defaultValue, result, test.expected)
-		}
-	}
-}
-
 // Вспомогательная функция для создания указателя на float64
 func Float64Ptr(f float64) *float64 {
 	return &f

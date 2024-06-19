@@ -20,7 +20,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 )
 
@@ -362,6 +361,7 @@ func main() {
 	e.Use(middleware.Logger)
 	e.Use(middleware.CheckHash)
 	e.Use(middleware.UnzipMiddleware)
+	e.Use(middleware.DecodeMiddleware)
 
 	e.POST("/update/:type_metric/:name_metric/:value_metric", AddMetric)
 	e.GET("/value/:type_metric/:name_metric", getMetric)
@@ -402,7 +402,6 @@ func main() {
 	files.InitMetrics()
 	go files.UpdateMetrics()
 
-	os.Exit(1)
 	fmt.Println("Running server on", cfg.FlagRunAddr)
 	echopprof.Wrap(e)
 	err := e.Start(cfg.FlagRunAddr)

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/dip96/metrics/internal/asymmetricEncryption/encode"
+	"github.com/dip96/metrics/internal/asymmetricEncryption/generate"
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/hash"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
@@ -28,6 +30,8 @@ func main() {
 	stop := make(chan struct{})
 	metricsChan := make(chan []metricModel.Metric)
 	gopsutilMetricsChan := make(chan []metricModel.Metric)
+
+	generate.Generate()
 
 	go collectMetricsRoutine(metricsChan, stop)
 	go collectGopsutilMetricsRoutine(gopsutilMetricsChan, stop)
@@ -299,8 +303,15 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 		log.Println("Error when serialization object:", err)
 	}
 
+	// Шифруем данные перед отправкой
+	encryptedData, err := encode.EncryptData(data)
+	if err != nil {
+		log.Println("Error when encrypting data:", err)
+		return
+	}
+
 	url := fmt.Sprintf("http://%s/updates/", cfg.FlagRunAddr)
-	b, err := utils.GzipCompress(data)
+	b, err := utils.GzipCompress(encryptedData)
 
 	if err != nil {
 		log.Println("Error when compress data:", err.Error())
@@ -317,7 +328,7 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Content-Encoding", "gzip")
+	req.Header.Add("Content-Encoding", "gzip,encrypted")
 
 	client := &http.Client{}
 	//TODO вынести в отдельную функцию

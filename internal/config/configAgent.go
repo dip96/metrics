@@ -19,6 +19,8 @@ type Agent struct {
 	Key string
 	// RateLimit - ограничение скорости в запросах в секунду.
 	RateLimit int
+	// CryptoKey - путь до файла с публичным ключом
+	CryptoKey string
 }
 
 // agentConfig - глобальная переменная, содержащая конфигурацию агента.
@@ -41,15 +43,16 @@ func LoadAgent() *Agent {
 func initAgentConfig() *Agent {
 	var cfg = Agent{}
 
-	//flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
-	flag.IntVar(&cfg.FlagReportInterval, "r", 10, "address and port to run server")
-	flag.IntVar(&cfg.FlagRuntime, "p", 2, "address and port to run server")
-	flag.StringVar(&cfg.Key, "k", "", "key")
-	flag.IntVar(&cfg.RateLimit, "l", 10, "Rate limit")
+	agentFlags := flag.NewFlagSet("agent", flag.ExitOnError)
+	//agentFlags.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
+	//agentFlags.StringVar(&cfg.CryptoKey, "crypto-key", "", "public key")
+	agentFlags.IntVar(&cfg.FlagReportInterval, "r", 10, "address and port to run server")
+	agentFlags.IntVar(&cfg.FlagRuntime, "p", 2, "address and port to run server")
+	agentFlags.StringVar(&cfg.Key, "k", "", "key")
+	agentFlags.IntVar(&cfg.RateLimit, "l", 10, "Rate limit")
 
-	flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-
-	flag.Parse()
+	agentFlags.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
+	agentFlags.StringVar(&cfg.CryptoKey, "crypto-key", "/home/dip96/go_project/src/metrics/keys/public.pem", "public key")
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		cfg.FlagRunAddr = envRunAddr
@@ -69,6 +72,10 @@ func initAgentConfig() *Agent {
 
 	if envRateLimit := os.Getenv("RATE_LIMIT"); envRateLimit != "" {
 		cfg.RateLimit, _ = strconv.Atoi(envRateLimit)
+	}
+
+	if envCryptoKey := os.Getenv("CryptoKey"); envCryptoKey != "" {
+		cfg.CryptoKey = envCryptoKey
 	}
 
 	return &cfg

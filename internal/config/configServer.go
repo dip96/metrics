@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 )
 
 // Server представляет конфигурацию сервера.
@@ -25,15 +26,18 @@ type Server struct {
 	MigrationPath string
 	// Key - ключ для аутентификации.
 	Key string
+	// CryptoKey - путь до файла с приватным ключом
+	CryptoKey string
 }
 
 // serverConfig - глобальная переменная, содержащая конфигурацию сервера.
 var serverConfig *Server
+var initOnceServer sync.Once
 
 // LoadServer загружает и инициализирует конфигурацию сервера.
 // Функция обеспечивает однократную инициализацию конфигурации.
 func LoadServer() *Server {
-	initOnce.Do(func() {
+	initOnceServer.Do(func() {
 		serverConfig = initServerConfig()
 	})
 
@@ -44,21 +48,22 @@ func LoadServer() *Server {
 // командной строки и переменных окружения.
 func initServerConfig() *Server {
 	var cfg = Server{}
+	serverFlags := flag.NewFlagSet("server", flag.ExitOnError)
 
-	//flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
-	//flag.StringVar(&cfg.DatabaseDsn, "d", "", "")
-	//flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
-	flag.StringVar(&cfg.DirStorageTmpPath, "", "/tmp", "Dir storage tmp file")
-	flag.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
-	flag.BoolVar(&cfg.Restore, "r", true, "")
-	flag.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
-	flag.StringVar(&cfg.Key, "k", "", "key")
+	//serverFlags.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
+	//serverFlags.StringVar(&cfg.DatabaseDsn, "d", "", "")
+	//serverFlags.StringVar(&cfg.CryptoKey, "crypto-key", "/tmp/keys", "private key")
+	//serverFlags.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
+	serverFlags.StringVar(&cfg.DirStorageTmpPath, "", "/tmp", "Dir storage tmp file")
+	serverFlags.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
+	serverFlags.BoolVar(&cfg.Restore, "r", true, "")
+	serverFlags.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
+	serverFlags.StringVar(&cfg.Key, "k", "", "key")
 
-	flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-	flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
-	flag.StringVar(&cfg.FileStoragePath, "f", "./metrics-db.json", "File to save metrics")
-
-	flag.Parse()
+	serverFlags.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
+	serverFlags.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
+	serverFlags.StringVar(&cfg.CryptoKey, "crypto-key", "/home/dip96/go_project/src/metrics/keys/private.pem", "private key")
+	serverFlags.StringVar(&cfg.FileStoragePath, "f", "./metrics-db.json", "File to save metrics")
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		cfg.FlagRunAddr = envRunAddr
@@ -82,6 +87,10 @@ func initServerConfig() *Server {
 
 	if envKey := os.Getenv("KEY"); envKey != "" {
 		cfg.Key = envKey
+	}
+
+	if envCryptoKey := os.Getenv("CryptoKey"); envCryptoKey != "" {
+		cfg.CryptoKey = envCryptoKey
 	}
 
 	return &cfg
