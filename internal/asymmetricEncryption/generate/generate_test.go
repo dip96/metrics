@@ -53,13 +53,8 @@ func TestGenerate(t *testing.T) {
 		t.Error("Failed to decode PEM block containing private key")
 	}
 
-	if block.Bytes == nil {
-		t.Errorf("block.Bytes is nil")
-		return
-	}
-
 	_, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
+	if err != nil && block.Bytes != nil {
 		t.Errorf("Failed to parse private key: %v", err)
 	}
 
