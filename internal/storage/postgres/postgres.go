@@ -180,3 +180,7 @@ func (d *DB) Ping() error {
 
 	return nil
 }
+
+func (d *DB) Close() {
+	d.Pool.Close()
+}

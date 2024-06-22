@@ -45,6 +45,10 @@ func (m *Storage) Clear() error {
 	return nil
 }
 
+func (m *Storage) Close() {
+
+}
+
 // NewStorage - конструктор для создания нового экземпляра Storage
 func NewStorage() *Storage {
 	return &Storage{

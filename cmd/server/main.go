@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
@@ -20,7 +21,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 )
 
 var (
@@ -398,16 +403,50 @@ func main() {
 		storage.Storage = memStorage.NewStorage()
 	}
 
+	// Канал для сигналов завершения
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
 	//TODO вынести логику в отдельный файл
 	files.InitMetrics()
 	go files.UpdateMetrics()
 
 	fmt.Println("Running server on", cfg.FlagRunAddr)
 	echopprof.Wrap(e)
-	err := e.Start(cfg.FlagRunAddr)
-	if err != nil {
-		panic(err)
+
+	go func() {
+		if err := e.Start(cfg.FlagRunAddr); err != nil && err != http.ErrServerClosed {
+			e.Logger.Fatal("shutting down the server")
+		}
+	}()
+
+	// Ожидаем сигнал завершения
+	<-stop
+
+	// Запускаем graceful shutdown
+	if err := gracefulShutdown(e, storage.Storage); err != nil {
+		log.Fatalf("Error during graceful shutdown: %v", err)
 	}
+}
+
+func gracefulShutdown(e *echo.Echo, store storage.StorageInterface) error {
+	// Устанавливаем таймаут для завершения
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Останавливаем сервер
+	if err := e.Shutdown(ctx); err != nil {
+		log.Printf("Error shutting down server: %v", err)
+	}
+
+	// Ожидаем завершения всех текущих запросов
+	// Это время также используется для завершения сохранения метрик
+	<-ctx.Done()
+
+	// Закрываем соединение с базой данных
+	store.Close()
+	log.Println("Graceful shutdown completed")
+	return nil
 }
 
 func printBuildInfo() {

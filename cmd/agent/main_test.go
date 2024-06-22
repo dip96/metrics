@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/dip96/metrics/internal/model/metric"
 	"github.com/stretchr/testify/assert"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -219,6 +221,79 @@ func TestCollectGopsutilMetricsRoutine_Stop(t *testing.T) {
 		t.Fatal("Expected no metrics, but received some")
 	default:
 	}
+}
+
+func TestGracefulShutdown(t *testing.T) {
+	// Создаем канал stop
+	stop := make(chan struct{})
+
+	// Создаем WaitGroup для синхронизации горутин
+	var wg sync.WaitGroup
+	wg.Add(2) // Теперь ожидаем две горутины
+
+	// Имитируем работающую горутину
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				fmt.Println("Goroutine received stop signal")
+				return
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}()
+
+	// Засекаем время начала
+	start := time.Now()
+
+	// Запускаем gracefulShutdown в отдельной горутине
+	go func() {
+		defer wg.Done()
+		gracefulShutdown(stop)
+	}()
+
+	// Ожидаем завершения всех горутин
+	wg.Wait()
+
+	// Проверяем, что прошло достаточно времени
+	elapsed := time.Since(start)
+	if elapsed < 5*time.Second {
+		t.Errorf("Shutdown took %v, expected at least 5 seconds", elapsed)
+	}
+
+	// Проверяем, что канал stop закрыт
+	select {
+	case _, ok := <-stop:
+		if ok {
+			t.Error("Stop channel is not closed")
+		}
+	default:
+		t.Error("Stop channel is not closed")
+	}
+}
+
+func TestPrepareMetricsRoutine(t *testing.T) {
+	// Создаем тестовые каналы
+	metricsChan := make(chan []metric.Metric)
+	gopsutilMetricsChan := make(chan []metric.Metric)
+	stop := make(chan struct{})
+
+	// Запускаем тестируемую функцию в отдельной горутине
+	go prepareMetricsRoutine(metricsChan, gopsutilMetricsChan, stop)
+
+	// Отправляем тестовые метрики
+	go func() {
+		metricsChan <- []metric.Metric{{ID: "test1"}}
+		gopsutilMetricsChan <- []metric.Metric{{ID: "test2"}}
+	}()
+
+	// Ждем некоторое время, чтобы метрики были обработаны
+	time.Sleep(2 * time.Second)
+
+	// Отправляем сигнал остановки
+	close(stop)
 }
 
 // Вспомогательная функция для создания указателя на float64
