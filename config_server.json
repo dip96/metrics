@@ -1,0 +1,8 @@
+{
+  "address": "0.0.0.0:8080",
+  "restore": true,
+  "store_interval": 1,
+  "store_file": "./metrics-db.json",
+  "database_dsn": "postgres://postgres:postgres@localhost:5432/metrics?sslmode=disable",
+  "crypto_key": "/home/dip96/go_project/src/metrics/keys/private.pem"
+}
