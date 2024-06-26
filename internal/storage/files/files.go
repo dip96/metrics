@@ -171,7 +171,7 @@ func initTmpProducer() (*Producer, error) {
 	cfg, err := config.LoadServer()
 
 	if err != nil {
-		log.Errorln("Failed to prepare server config: %v\n", err)
+		log.Errorln("Failed to prepare server config:", err.Error())
 		return nil, err
 	}
 	tmpFile, err := os.CreateTemp(cfg.DirStorageTmpPath, "*.tmp")
