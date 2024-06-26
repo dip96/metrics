@@ -38,17 +38,22 @@ var initOnceServer sync.Once
 
 // LoadServer загружает и инициализирует конфигурацию сервера.
 // Функция обеспечивает однократную инициализацию конфигурации.
-func LoadServer() *Server {
+func LoadServer() (*Server, error) {
+	var err error
 	initOnceServer.Do(func() {
-		serverConfig = initServerConfig()
+		serverConfig, err = initServerConfig()
 	})
 
-	return serverConfig
+	if err != nil {
+		return nil, err
+	}
+
+	return serverConfig, nil
 }
 
 // initServerConfig инициализирует конфигурацию сервера на основе переданных флагов
 // командной строки и переменных окружения.
-func initServerConfig() *Server {
+func initServerConfig() (*Server, error) {
 	var cfg = Server{}
 	serverFlags := flag.NewFlagSet("server", flag.ExitOnError)
 
@@ -64,7 +69,11 @@ func initServerConfig() *Server {
 	serverFlags.StringVar(&cfg.Config, "c", "/home/dip96/go_project/src/metrics/config_server.json", "Config path")
 
 	if cfg.Config != "" {
-		readConfigFileServer(cfg.Config, &cfg)
+		err := readConfigFileServer(cfg.Config, &cfg)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -99,19 +108,21 @@ func initServerConfig() *Server {
 		cfg.Config = envConfig
 	}
 
-	return &cfg
+	return &cfg, nil
 }
 
-func readConfigFileServer(path string, cfg *Server) {
+func readConfigFileServer(path string, cfg *Server) error {
 	file, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(cfg)
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }

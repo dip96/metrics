@@ -22,10 +22,21 @@ func TestGenerate(t *testing.T) {
 	publicKeyPath := filepath.Join(tempDir, "public.pem")
 
 	// Устанавливаем временный конфиг с путями к файлам для ключей
-	cnf := config.LoadServer()
+	cnf, err := config.LoadServer()
+
+	if err != nil {
+		t.Errorf("Failed to prepare server config: %v\n", err)
+		return
+	}
+
 	cnf.CryptoKey = privateKeyPath
 	// Устанавливаем временный конфиг с путем к файлу с открытым ключом
-	cnfAgent := config.LoadAgent()
+	cnfAgent, err := config.LoadAgent()
+
+	if err != nil {
+		t.Errorf("Failed to prepare agent config: %v\n", err)
+		return
+	}
 	cnfAgent.CryptoKey = publicKeyPath
 
 	// Вызываем функцию генерации ключей

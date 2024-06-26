@@ -360,7 +360,12 @@ func AddMetrics(c echo.Context) error {
 
 func main() {
 	printBuildInfo()
-	cfg := config.LoadServer()
+	cfg, err := config.LoadServer()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare server config: %v\n", err)
+		panic(err)
+	}
 
 	e := echo.New()
 	e.Use(middleware.Logger)
@@ -408,7 +413,12 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 
 	//TODO вынести логику в отдельный файл
-	files.InitMetrics()
+	err = files.InitMetrics()
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	go files.UpdateMetrics()
 
 	fmt.Println("Running server on", cfg.FlagRunAddr)

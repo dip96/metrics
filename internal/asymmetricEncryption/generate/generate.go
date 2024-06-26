@@ -34,14 +34,28 @@ func Generate() {
 		return
 	}
 
+	cnf, err := config.LoadServer()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare server config: %v\n", err)
+		return
+	}
+
 	// Записываем ключи в файлы
-	err = os.WriteFile(config.LoadServer().CryptoKey, privatePEM, 0600)
+	err = os.WriteFile(cnf.CryptoKey, privatePEM, 0600)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	err = os.WriteFile(config.LoadAgent().CryptoKey, publicPEM, 0644)
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
+
+	err = os.WriteFile(cfg.CryptoKey, publicPEM, 0644)
 	if err != nil {
 		fmt.Println(err)
 		return

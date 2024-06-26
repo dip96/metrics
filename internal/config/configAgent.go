@@ -34,16 +34,20 @@ var initOnce sync.Once
 
 // LoadAgent загружает и инициализирует конфигурацию агента.
 // Функция обеспечивает однократную инициализацию конфигурации.
-func LoadAgent() *Agent {
+func LoadAgent() (*Agent, error) {
+	var err error
 	initOnce.Do(func() {
-		agentConfig = initAgentConfig()
+		agentConfig, err = initAgentConfig()
 	})
-	return agentConfig
+	if err != nil {
+		return nil, err
+	}
+	return agentConfig, nil
 }
 
 // initAgentConfig инициализирует конфигурацию агента на основе переданных флагов
 // командной строки и переменных окружения.
-func initAgentConfig() *Agent {
+func initAgentConfig() (*Agent, error) {
 	var cfg = Agent{}
 
 	agentFlags := flag.NewFlagSet("agent", flag.ExitOnError)
@@ -56,7 +60,10 @@ func initAgentConfig() *Agent {
 	agentFlags.StringVar(&cfg.Config, "c", "/home/dip96/go_project/src/metrics/config_agent.json", "Config path")
 
 	if cfg.Config != "" {
-		readConfigFileAgent(cfg.Config, cfg)
+		err := readConfigFileAgent(cfg.Config, cfg)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
@@ -87,19 +94,21 @@ func initAgentConfig() *Agent {
 		cfg.Config = envConfig
 	}
 
-	return &cfg
+	return &cfg, nil
 }
 
-func readConfigFileAgent(path string, cfg Agent) {
+func readConfigFileAgent(path string, cfg Agent) error {
 	file, err := os.Open(path)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(&cfg)
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }

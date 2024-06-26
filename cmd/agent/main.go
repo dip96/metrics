@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -28,6 +29,10 @@ var (
 	buildCommit  = "N/A"
 )
 
+var wg sync.WaitGroup
+
+const countGor = 3
+
 func main() {
 	printBuildInfo()
 	stop := make(chan struct{})
@@ -36,6 +41,7 @@ func main() {
 
 	generate.Generate()
 
+	wg.Add(countGor)
 	go collectMetricsRoutine(metricsChan, stop)
 	go collectGopsutilMetricsRoutine(gopsutilMetricsChan, stop)
 	go prepareMetricsRoutine(metricsChan, gopsutilMetricsChan, stop)
@@ -52,13 +58,24 @@ func main() {
 }
 
 func gracefulShutdown(stop chan struct{}) {
-	log.Println("Init graceful shutdown")
+	log.Println("Initiating graceful shutdown")
 
 	// Закрываем канал stop, чтобы сигнализировать всем горутинам о завершении
 	close(stop)
 
-	// Время на завершение всех операций
-	time.Sleep(5 * time.Second)
+	// таймаут для завершения
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("All goroutines completed successfully")
+	case <-time.After(10 * time.Second):
+		log.Println("Graceful shutdown timed out")
+	}
 
 	log.Println("Graceful shutdown completed")
 }
@@ -72,6 +89,8 @@ func printBuildInfo() {
 // collectGopsutilMetricsRoutine - горутина для сбора метрик из gopsutil.
 // Метрики помещаются в канал gopsutilMetricsChan с интервалом gopsutilInterval.
 func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
+	defer wg.Done()
+
 	gopsutilInterval := 5 * time.Second
 
 	ticker := time.NewTicker(gopsutilInterval)
@@ -80,6 +99,7 @@ func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metr
 	for {
 		select {
 		case <-stop:
+			log.Println("Stop collectGopsutilMetricsRoutine")
 			return
 		case <-ticker.C:
 			gopsutilMetrics := collectGopsutilMetrics()
@@ -91,7 +111,14 @@ func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metr
 // collectMetricsRoutine - горутина для сбора метрик из runtime.
 // Метрики помещаются в канал metricsChan с интервалом updateInterval.
 func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
-	cfg := config.LoadAgent()
+	defer wg.Done()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
+
 	updateInterval := time.Duration(cfg.FlagRuntime) * time.Second
 	lastUpdateTime := time.Now()
 	PollCount := int64(1)
@@ -99,6 +126,7 @@ func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan 
 	for {
 		select {
 		case <-stop:
+			log.Println("Stop collectMetricsRoutine")
 			return
 		default:
 			if time.Since(lastUpdateTime) > updateInterval {
@@ -115,7 +143,13 @@ func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan 
 // Метрики из каналов metricsChan и gopsutilMetricsChan объединяются и отправляются с интервалом sendInterval.
 // Для отправки метрик используется пул воркеров с размером rateLimit.
 func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <-chan []metricModel.Metric, stop <-chan struct{}) {
-	cfg := config.LoadAgent()
+	defer wg.Done()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
 	rateLimit := cfg.RateLimit
 	sendInterval := time.Duration(cfg.FlagReportInterval) * time.Second
 
@@ -140,6 +174,7 @@ func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetr
 				}
 			}
 			close(jobChan)
+			log.Println("Stop prepareMetricsRoutine")
 			return
 		default:
 			if time.Since(lastSendTime) > sendInterval {
@@ -293,7 +328,12 @@ func collectRandomValue() float64 {
 }
 
 func sendMetricsButch(metrics []metricModel.Metric) {
-	cfg := config.LoadAgent()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
 	data, err := json.Marshal(metrics)
 
 	if err != nil {

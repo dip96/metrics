@@ -46,7 +46,12 @@ func TestDecryptData(t *testing.T) {
 	}
 
 	// Устанавливаем временный конфиг с путем к файлу с закрытым ключом
-	cnf := config.LoadServer()
+	cnf, err := config.LoadServer()
+
+	if err != nil {
+		t.Fatalf("Failed to prepare server config: %v\n", err)
+	}
+
 	cnf.CryptoKey = tmpKeyFile.Name()
 
 	// Вызываем функцию для тестирования

@@ -41,8 +41,12 @@ func TestEncryptData(t *testing.T) {
 	}
 
 	// Устанавливаем временный конфиг с путем к файлу с открытым ключом
-	cnf := config.LoadAgent()
-	cnf.CryptoKey = tmpKeyFile.Name()
+	cfg, err := config.LoadAgent()
+	if err != nil {
+		t.Errorf("Failed to prepare agent config: %v\n", err)
+		return
+	}
+	cfg.CryptoKey = tmpKeyFile.Name()
 
 	// Вызываем функцию для тестирования
 	ciphertext, err := encode.EncryptData(plaintext)
