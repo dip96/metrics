@@ -125,7 +125,7 @@ func LoadServer() *MockConfig {
 }
 
 func TestInitTmpProducer(t *testing.T) {
-	producer := initTmpProducer()
+	producer, _ := initTmpProducer()
 
 	// Check if the file was created in the correct directory
 	cfg := LoadServer()
@@ -144,9 +144,4 @@ func TestInitTmpProducer(t *testing.T) {
 // Вспомогательная функция для создания указателя на float64
 func Float64Ptr(f float64) *float64 {
 	return &f
-}
-
-// Вспомогательная функция для создания указателя на int64
-func Int64Ptr(i int64) *int64 {
-	return &i
 }

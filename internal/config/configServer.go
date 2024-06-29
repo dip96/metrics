@@ -1,64 +1,80 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
-	"fmt"
 	"os"
 	"strconv"
+	"sync"
 )
 
 // Server представляет конфигурацию сервера.
 type Server struct {
 	// FlagRunAddr - адрес и порт для запуска сервера.
-	FlagRunAddr string
+	FlagRunAddr string `json:"address"`
 	// StoreInterval - интервал сохранения метрик в секундах.
-	StoreInterval int
+	StoreInterval int `json:"store_interval"`
 	// FileStoragePath - путь к файлу для хранения метрик.
-	FileStoragePath string
+	FileStoragePath string `json:"store_file"`
 	// DirStorageTmpPath - путь к временному каталогу для хранения файлов.
-	DirStorageTmpPath string
+	DirStorageTmpPath string `json:"dir_storage_tmp_path"`
 	// Restore - флаг для восстановления данных из хранилища при запуске.
-	Restore bool
+	Restore bool `json:"restore"`
 	// DatabaseDsn - строка подключения к базе данных.
-	DatabaseDsn string
+	DatabaseDsn string `json:"database_dsn"`
 	// MigrationPath - путь к файлам миграций базы данных.
-	MigrationPath string
+	MigrationPath string `json:"migration_path"`
 	// Key - ключ для аутентификации.
-	Key string
+	Key string `json:"key"`
+	// CryptoKey - путь до файла с приватным ключом
+	CryptoKey string `json:"crypto_key"`
+	// Config - путь до файла конфигурации
+	Config string
 }
 
 // serverConfig - глобальная переменная, содержащая конфигурацию сервера.
 var serverConfig *Server
+var initOnceServer sync.Once
 
 // LoadServer загружает и инициализирует конфигурацию сервера.
 // Функция обеспечивает однократную инициализацию конфигурации.
-func LoadServer() *Server {
-	initOnce.Do(func() {
-		serverConfig = initServerConfig()
+func LoadServer() (*Server, error) {
+	var err error
+	initOnceServer.Do(func() {
+		serverConfig, err = initServerConfig()
 	})
 
-	return serverConfig
+	if err != nil {
+		return nil, err
+	}
+
+	return serverConfig, nil
 }
 
 // initServerConfig инициализирует конфигурацию сервера на основе переданных флагов
 // командной строки и переменных окружения.
-func initServerConfig() *Server {
+func initServerConfig() (*Server, error) {
 	var cfg = Server{}
+	serverFlags := flag.NewFlagSet("server", flag.ExitOnError)
 
-	//flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
-	//flag.StringVar(&cfg.DatabaseDsn, "d", "", "")
-	//flag.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
-	flag.StringVar(&cfg.DirStorageTmpPath, "", "/tmp", "Dir storage tmp file")
-	flag.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
-	flag.BoolVar(&cfg.Restore, "r", true, "")
-	flag.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
-	flag.StringVar(&cfg.Key, "k", "", "key")
+	serverFlags.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
+	serverFlags.StringVar(&cfg.DatabaseDsn, "d", "", "")
+	serverFlags.StringVar(&cfg.CryptoKey, "crypto-key", "/tmp/keys", "private key")
+	serverFlags.StringVar(&cfg.FileStoragePath, "f", "/tmp/metrics-db.json", "File to save metrics")
+	serverFlags.StringVar(&cfg.DirStorageTmpPath, "", "/tmp", "Dir storage tmp file")
+	serverFlags.IntVar(&cfg.StoreInterval, "i", 5, "Interval to save metrics")
+	serverFlags.BoolVar(&cfg.Restore, "r", true, "")
+	serverFlags.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
+	serverFlags.StringVar(&cfg.Key, "k", "", "key")
+	serverFlags.StringVar(&cfg.Config, "c", "/home/dip96/go_project/src/metrics/config_server.json", "Config path")
 
-	flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-	flag.StringVar(&cfg.DatabaseDsn, "d", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", "postgres", "postgres", "localhost", 5432, "metrics"), "")
-	flag.StringVar(&cfg.FileStoragePath, "f", "./metrics-db.json", "File to save metrics")
+	if cfg.Config != "" {
+		err := readConfigFileServer(cfg.Config, &cfg)
 
-	flag.Parse()
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		cfg.FlagRunAddr = envRunAddr
@@ -84,5 +100,29 @@ func initServerConfig() *Server {
 		cfg.Key = envKey
 	}
 
-	return &cfg
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		cfg.CryptoKey = envCryptoKey
+	}
+
+	if envConfig := os.Getenv("CONFIG"); envConfig != "" {
+		cfg.Config = envConfig
+	}
+
+	return &cfg, nil
+}
+
+func readConfigFileServer(path string, cfg *Server) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(cfg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

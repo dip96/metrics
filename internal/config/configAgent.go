@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 	"strconv"
@@ -10,15 +11,19 @@ import (
 // Agent представляет конфигурацию агента.
 type Agent struct {
 	// FlagRunAddr - адрес и порт для запуска сервера.
-	FlagRunAddr string
+	FlagRunAddr string `json:"address"`
 	// FlagReportInterval - интервал отчетности в секундах.
-	FlagReportInterval int
+	FlagReportInterval int `json:"report_interval"`
 	// FlagRuntime - время работы приложения в секундах.
-	FlagRuntime int
+	FlagRuntime int `json:"runtime"`
 	// Key - ключ для аутентификации.
-	Key string
+	Key string `json:"key"`
 	// RateLimit - ограничение скорости в запросах в секунду.
-	RateLimit int
+	RateLimit int `json:"rate_limit"`
+	// CryptoKey - путь до файла с публичным ключом
+	CryptoKey string `json:"crypto_key"`
+	// Config - путь до файла конфигурации
+	Config string
 }
 
 // agentConfig - глобальная переменная, содержащая конфигурацию агента.
@@ -29,27 +34,37 @@ var initOnce sync.Once
 
 // LoadAgent загружает и инициализирует конфигурацию агента.
 // Функция обеспечивает однократную инициализацию конфигурации.
-func LoadAgent() *Agent {
+func LoadAgent() (*Agent, error) {
+	var err error
 	initOnce.Do(func() {
-		agentConfig = initAgentConfig()
+		agentConfig, err = initAgentConfig()
 	})
-	return agentConfig
+	if err != nil {
+		return nil, err
+	}
+	return agentConfig, nil
 }
 
 // initAgentConfig инициализирует конфигурацию агента на основе переданных флагов
 // командной строки и переменных окружения.
-func initAgentConfig() *Agent {
+func initAgentConfig() (*Agent, error) {
 	var cfg = Agent{}
 
-	//flag.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
-	flag.IntVar(&cfg.FlagReportInterval, "r", 10, "address and port to run server")
-	flag.IntVar(&cfg.FlagRuntime, "p", 2, "address and port to run server")
-	flag.StringVar(&cfg.Key, "k", "", "key")
-	flag.IntVar(&cfg.RateLimit, "l", 10, "Rate limit")
+	agentFlags := flag.NewFlagSet("agent", flag.ExitOnError)
+	agentFlags.StringVar(&cfg.FlagRunAddr, "a", "localhost:8080", "address and port to run server")
+	agentFlags.StringVar(&cfg.CryptoKey, "crypto-key", "", "public key")
+	agentFlags.IntVar(&cfg.FlagReportInterval, "r", 10, "address and port to run server")
+	agentFlags.IntVar(&cfg.FlagRuntime, "p", 2, "address and port to run server")
+	agentFlags.StringVar(&cfg.Key, "k", "", "key")
+	agentFlags.IntVar(&cfg.RateLimit, "l", 10, "Rate limit")
+	agentFlags.StringVar(&cfg.Config, "c", "/home/dip96/go_project/src/metrics/config_agent.json", "Config path")
 
-	flag.StringVar(&cfg.FlagRunAddr, "a", "0.0.0.0:8080", "address and port to run server")
-
-	flag.Parse()
+	if cfg.Config != "" {
+		err := readConfigFileAgent(cfg.Config, cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
 		cfg.FlagRunAddr = envRunAddr
@@ -71,5 +86,29 @@ func initAgentConfig() *Agent {
 		cfg.RateLimit, _ = strconv.Atoi(envRateLimit)
 	}
 
-	return &cfg
+	if envCryptoKey := os.Getenv("CRYPTO_KEY"); envCryptoKey != "" {
+		cfg.CryptoKey = envCryptoKey
+	}
+
+	if envConfig := os.Getenv("CONFIG"); envConfig != "" {
+		cfg.Config = envConfig
+	}
+
+	return &cfg, nil
+}
+
+func readConfigFileAgent(path string, cfg Agent) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&cfg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

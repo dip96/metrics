@@ -39,7 +39,11 @@ func (p *Producer) WriteEvent(metric metricModel.Metric) error {
 }
 
 func (p *Producer) Close() error {
-	cfg := config.LoadServer()
+	cfg, err := config.LoadServer()
+
+	if err != nil {
+		return err
+	}
 
 	filename := cfg.FileStoragePath
 	if err := p.file.Close(); err != nil {
@@ -107,8 +111,12 @@ func SaveMetrics(producer ioModel.ProducerInterface) {
 }
 
 // InitMetrics инициализирует метрики из файлового хранилища.
-func InitMetrics() {
-	cfg := config.LoadServer()
+func InitMetrics() error {
+	cfg, err := config.LoadServer()
+
+	if err != nil {
+		return err
+	}
 	Consumer, err := NewConsumer(cfg.FileStoragePath)
 	if err != nil {
 		log.Errorln(err)
@@ -133,17 +141,25 @@ func InitMetrics() {
 			log.Errorln(err)
 			continue
 		}
-
 	}
+
+	return nil
 }
 
 // UpdateMetrics обновляет метрики в файловом хранилище в бесконечном цикле.
 func UpdateMetrics() error {
-	cfg := config.LoadServer()
+	cfg, err := config.LoadServer()
+
+	if err != nil {
+		return err
+	}
 	ticker := time.NewTicker(time.Duration(cfg.StoreInterval) * time.Second)
 	if cfg.Restore {
 		for range ticker.C {
-			producer := initTmpProducer()
+			producer, err := initTmpProducer()
+			if err != nil {
+				return err
+			}
 			SaveMetrics(producer)
 			producer.Close()
 		}
@@ -151,16 +167,23 @@ func UpdateMetrics() error {
 	return nil
 }
 
-func initTmpProducer() *Producer {
-	cfg := config.LoadServer()
+func initTmpProducer() (*Producer, error) {
+	cfg, err := config.LoadServer()
+
+	if err != nil {
+		log.Errorln("Failed to prepare server config:", err.Error())
+		return nil, err
+	}
 	tmpFile, err := os.CreateTemp(cfg.DirStorageTmpPath, "*.tmp")
 	if err != nil {
 		log.Errorln("Error creating the tmp file:", err.Error())
+		return nil, err
 	}
 
 	file, err := os.OpenFile(tmpFile.Name(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Errorln("Error opening the tmp file:", err.Error())
+		return nil, err
 	}
 
 	producer := &Producer{
@@ -168,5 +191,5 @@ func initTmpProducer() *Producer {
 		writer: bufio.NewWriter(file),
 	}
 
-	return producer
+	return producer, nil
 }

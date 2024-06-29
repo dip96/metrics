@@ -1,5 +1,5 @@
 https://habr.com/ru/companies/vk/articles/463063/ - интерфейсы
-
+2
 http://172.20.255.21:8080/debug/pprof/
 go tool pprof -http="172.20.255.21:8081" -seconds=30 http://172.20.255.21:8080/debug/pprof/profile
 

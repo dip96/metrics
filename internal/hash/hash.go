@@ -7,7 +7,13 @@ import (
 )
 
 func CalculateHashAgent(b []byte) string {
-	cfg := config.LoadAgent()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return ""
+	}
+
 	if cfg.Key != "" {
 		calculateHash(b, cfg.Key)
 	}
@@ -16,7 +22,13 @@ func CalculateHashAgent(b []byte) string {
 }
 
 func CalculateHashServer(b []byte) string {
-	cfg := config.LoadServer()
+	cfg, err := config.LoadServer()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare server config: %v\n", err)
+		return ""
+	}
+
 	if cfg.Key != "" {
 		return calculateHash(b, cfg.Key)
 	}

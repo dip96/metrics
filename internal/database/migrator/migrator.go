@@ -30,7 +30,12 @@ func NewMigrator() (*Migrator, error) {
 	return instance, err
 }
 func newMigrator() (*Migrator, error) {
-	cnf := config.LoadServer()
+	cnf, err := config.LoadServer()
+
+	if err != nil {
+		return nil, err
+	}
+
 	driver.InitFile()
 	driver.InitPostgres()
 	m, err := migrate.New(cnf.MigrationPath, cnf.DatabaseDsn)

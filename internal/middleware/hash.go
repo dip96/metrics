@@ -13,7 +13,11 @@ import (
 
 func CheckHash(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		cfg := config.LoadServer()
+		cfg, err := config.LoadServer()
+
+		if err != nil {
+			return err
+		}
 
 		if cfg.Key != "" {
 			body, err := io.ReadAll(c.Request().Body)
@@ -36,7 +40,7 @@ func CheckHash(next echo.HandlerFunc) echo.HandlerFunc {
 			}
 		}
 
-		err := next(c)
+		err = next(c)
 
 		return err
 	}

@@ -1,0 +1,6 @@
+{
+  "address": "0.0.0.0:8080",
+  "report_interval": 1,
+  "poll_interval": 1,
+  "crypto_key": "/home/dip96/go_project/src/metrics/keys/public.pem"
+}

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/dip96/metrics/internal/asymmetricEncryption/encode"
+	"github.com/dip96/metrics/internal/asymmetricEncryption/generate"
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/hash"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
@@ -13,7 +15,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"os/signal"
 	"runtime"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -23,17 +29,55 @@ var (
 	buildCommit  = "N/A"
 )
 
+var wg sync.WaitGroup
+
+const countGor = 3
+
 func main() {
 	printBuildInfo()
 	stop := make(chan struct{})
 	metricsChan := make(chan []metricModel.Metric)
 	gopsutilMetricsChan := make(chan []metricModel.Metric)
 
+	generate.Generate()
+
+	wg.Add(countGor)
 	go collectMetricsRoutine(metricsChan, stop)
 	go collectGopsutilMetricsRoutine(gopsutilMetricsChan, stop)
 	go prepareMetricsRoutine(metricsChan, gopsutilMetricsChan, stop)
 
-	<-stop
+	// Создаем канал для сигналов
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+	// Ожидаем сигнал
+	<-sigChan
+
+	// Инициируем graceful shutdown
+	gracefulShutdown(stop)
+}
+
+func gracefulShutdown(stop chan struct{}) {
+	log.Println("Initiating graceful shutdown")
+
+	// Закрываем канал stop, чтобы сигнализировать всем горутинам о завершении
+	close(stop)
+
+	// таймаут для завершения
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("All goroutines completed successfully")
+	case <-time.After(10 * time.Second):
+		log.Println("Graceful shutdown timed out")
+	}
+
+	log.Println("Graceful shutdown completed")
 }
 
 func printBuildInfo() {
@@ -45,6 +89,8 @@ func printBuildInfo() {
 // collectGopsutilMetricsRoutine - горутина для сбора метрик из gopsutil.
 // Метрики помещаются в канал gopsutilMetricsChan с интервалом gopsutilInterval.
 func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
+	defer wg.Done()
+
 	gopsutilInterval := 5 * time.Second
 
 	ticker := time.NewTicker(gopsutilInterval)
@@ -53,6 +99,7 @@ func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metr
 	for {
 		select {
 		case <-stop:
+			log.Println("Stop collectGopsutilMetricsRoutine")
 			return
 		case <-ticker.C:
 			gopsutilMetrics := collectGopsutilMetrics()
@@ -64,7 +111,14 @@ func collectGopsutilMetricsRoutine(gopsutilMetricsChan chan<- []metricModel.Metr
 // collectMetricsRoutine - горутина для сбора метрик из runtime.
 // Метрики помещаются в канал metricsChan с интервалом updateInterval.
 func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan struct{}) {
-	cfg := config.LoadAgent()
+	defer wg.Done()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
+
 	updateInterval := time.Duration(cfg.FlagRuntime) * time.Second
 	lastUpdateTime := time.Now()
 	PollCount := int64(1)
@@ -72,6 +126,7 @@ func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan 
 	for {
 		select {
 		case <-stop:
+			log.Println("Stop collectMetricsRoutine")
 			return
 		default:
 			if time.Since(lastUpdateTime) > updateInterval {
@@ -88,7 +143,13 @@ func collectMetricsRoutine(metricsChan chan<- []metricModel.Metric, stop <-chan 
 // Метрики из каналов metricsChan и gopsutilMetricsChan объединяются и отправляются с интервалом sendInterval.
 // Для отправки метрик используется пул воркеров с размером rateLimit.
 func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetricsChan <-chan []metricModel.Metric, stop <-chan struct{}) {
-	cfg := config.LoadAgent()
+	defer wg.Done()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
 	rateLimit := cfg.RateLimit
 	sendInterval := time.Duration(cfg.FlagReportInterval) * time.Second
 
@@ -105,7 +166,15 @@ func prepareMetricsRoutine(metricsChan <-chan []metricModel.Metric, gopsutilMetr
 	for {
 		select {
 		case <-stop:
+			log.Println("Preparing final metrics before shutdown...")
+			// Отправляем все оставшиеся метрики
+			for metrics := range mergedMetricsChan {
+				for _, m := range metrics {
+					jobChan <- m
+				}
+			}
 			close(jobChan)
+			log.Println("Stop prepareMetricsRoutine")
 			return
 		default:
 			if time.Since(lastSendTime) > sendInterval {
@@ -159,6 +228,11 @@ func sendMetricsRoutine(jobChan <-chan metricModel.Metric, stop <-chan struct{})
 	for {
 		select {
 		case <-stop:
+			log.Println("Sending final metrics...")
+			// Отправляем все оставшиеся метрики в канале
+			for metric := range jobChan {
+				sendMetricsButch([]metricModel.Metric{metric})
+			}
 			return
 		case metric := <-jobChan:
 			sendMetricsButch([]metricModel.Metric{metric})
@@ -253,54 +327,28 @@ func collectRandomValue() float64 {
 	return rand.Float64()
 }
 
-func sendMetrics(metrics []metricModel.Metric) {
-	cfg := config.LoadAgent()
-	for _, metric := range metrics {
-		data, err := json.Marshal(metric)
-
-		if err != nil {
-			log.Println("Error when serialization object:", err)
-		}
-
-		url := fmt.Sprintf("http://%s/update/", cfg.FlagRunAddr)
-		b, err := utils.GzipCompress(data)
-
-		if err != nil {
-			log.Println("Error when compress data:", err.Error())
-		}
-
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
-		if err != nil {
-			log.Println("Error when created request data:", err.Error())
-		}
-
-		req.Header.Add("Content-Type", "application/json")
-		req.Header.Add("Content-Encoding", "gzip")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Println("Error when sending data:", err.Error())
-			return
-		} else {
-			err = resp.Body.Close()
-			if err != nil {
-				log.Println("Error closing the connection:", err)
-			}
-		}
-	}
-}
-
 func sendMetricsButch(metrics []metricModel.Metric) {
-	cfg := config.LoadAgent()
+	cfg, err := config.LoadAgent()
+
+	if err != nil {
+		fmt.Printf("Failed to prepare agent config: %v\n", err)
+		return
+	}
 	data, err := json.Marshal(metrics)
 
 	if err != nil {
 		log.Println("Error when serialization object:", err)
 	}
 
+	// Шифруем данные перед отправкой
+	encryptedData, err := encode.EncryptData(data)
+	if err != nil {
+		log.Println("Error when encrypting data:", err)
+		return
+	}
+
 	url := fmt.Sprintf("http://%s/updates/", cfg.FlagRunAddr)
-	b, err := utils.GzipCompress(data)
+	b, err := utils.GzipCompress(encryptedData)
 
 	if err != nil {
 		log.Println("Error when compress data:", err.Error())
@@ -317,7 +365,7 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Content-Encoding", "gzip")
+	req.Header.Add("Content-Encoding", "gzip,encrypted")
 
 	client := &http.Client{}
 	//TODO вынести в отдельную функцию

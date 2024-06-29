@@ -11,4 +11,5 @@ type StorageInterface interface {
 	GetAll() (map[string]metric.Metric, error)
 	SetAll(map[string]metric.Metric) error
 	Clear() error
+	Close()
 }
