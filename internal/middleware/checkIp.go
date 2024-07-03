@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func CheckIp(next echo.HandlerFunc) echo.HandlerFunc {
+func CheckIP(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 
 		cfg, err := config.LoadServer()
