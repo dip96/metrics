@@ -14,6 +14,7 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -327,6 +328,10 @@ func collectRandomValue() float64 {
 	return rand.Float64()
 }
 
+//10
+//8			//12
+// 6     7
+
 func sendMetricsButch(metrics []metricModel.Metric) {
 	cfg, err := config.LoadAgent()
 
@@ -367,6 +372,11 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip,encrypted")
 
+	localIP := getIP()
+	if localIP != "" {
+		req.Header.Add("X-Real-IP", localIP)
+	}
+
 	client := &http.Client{}
 	//TODO вынести в отдельную функцию
 	retryDelays := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
@@ -388,6 +398,22 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 			return
 		}
 	}
+}
+
+func getIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// получаем ip-адрес
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
 
 func createMetricFromFloat64(name string, typeMetric metricModel.MetricType, value float64) metricModel.Metric {

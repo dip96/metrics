@@ -369,6 +369,7 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.Logger)
+	e.Use(middleware.CheckIp)
 	e.Use(middleware.CheckHash)
 	e.Use(middleware.UnzipMiddleware)
 	e.Use(middleware.DecodeMiddleware)

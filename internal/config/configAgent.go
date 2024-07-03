@@ -60,7 +60,7 @@ func initAgentConfig() (*Agent, error) {
 	agentFlags.StringVar(&cfg.Config, "c", "/home/dip96/go_project/src/metrics/config_agent.json", "Config path")
 
 	if cfg.Config != "" {
-		err := readConfigFileAgent(cfg.Config, cfg)
+		err := readConfigFileAgent(cfg.Config, &cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func initAgentConfig() (*Agent, error) {
 	return &cfg, nil
 }
 
-func readConfigFileAgent(path string, cfg Agent) error {
+func readConfigFileAgent(path string, cfg *Agent) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
