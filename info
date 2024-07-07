@@ -20,6 +20,17 @@ go run ./cmd/multichecker ./...
 build with flags
 go build -ldflags "-X main.buildVersion=1.2.3 -X main.buildDate=2023-06-12 -X main.buildCommit=a1b2c3d4e5f6" -o main.go
 
+PROTOBUF
+protoc --version
+protoc --go_out=. --go_opt=paths=import --go-grpc_out=. --go-grpc_opt=paths=import protos/base/metric/base.proto protos/v1/metric/metric_service.proto protos/v2/metric/metric_service.proto
+
+
+
+
+protoc --go_out=paths=source_relative:protobuf \ --go-grpc_out=paths=source_relative:protobuf \ --go_opt=Mprotos/base/metric/base.proto=github.com/dip96/metrics/protobuf/metric/base \ --go_opt=Mprotos/v1/metric/metric_service.proto=github.com/dip96/metrics/protobuf/metric/v1 \ --go_opt=Mprotos/v2/metric/metric_service.proto=github.com/dip96/metrics/protobuf/metric/v2 \ --go-grpc_opt=Mprotos/base/metric/base.proto=github.com/dip96/metrics/protobuf/metric/base \ --go-grpc_opt=Mprotos/v1/metric/metric_service.proto=github.com/dip96/metrics/protobuf/metric/v1 \ --go-grpc_opt=Mprotos/v2/metric/metric_service.proto=github.com/dip96/metrics/protobuf/metric/v2 \ protos/metric/base/base.proto \ protos/metric/v1/metric_service.proto \ protos/metric/v2/metric_service.proto
+
+
+
 запуск тестов:
 ./metricstest -test.v -test.run=^TestIteration6 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080
 ./metricstest -test.v -test.run=^TestIteration7 -agent-binary-path=cmd/agent/agent -binary-path=cmd/server/server  -source-path=. --server-port=8080

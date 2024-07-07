@@ -2,16 +2,21 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/dip96/metrics/internal/asymmetricEncryption/encode"
 	"github.com/dip96/metrics/internal/asymmetricEncryption/generate"
 	"github.com/dip96/metrics/internal/config"
+	"github.com/dip96/metrics/internal/grpcservices/metric"
 	"github.com/dip96/metrics/internal/hash"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/utils"
+	pb "github.com/dip96/metrics/protobuf/metrics"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"log"
 	"math/rand"
 	"net"
@@ -233,10 +238,12 @@ func sendMetricsRoutine(jobChan <-chan metricModel.Metric, stop <-chan struct{})
 			// Отправляем все оставшиеся метрики в канале
 			for metric := range jobChan {
 				sendMetricsButch([]metricModel.Metric{metric})
+				sendMetricsButchGRPC([]metricModel.Metric{metric})
 			}
 			return
 		case metric := <-jobChan:
 			sendMetricsButch([]metricModel.Metric{metric})
+			sendMetricsButchGRPC([]metricModel.Metric{metric})
 		}
 	}
 }
@@ -328,10 +335,6 @@ func collectRandomValue() float64 {
 	return rand.Float64()
 }
 
-//10
-//8			//12
-// 6     7
-
 func sendMetricsButch(metrics []metricModel.Metric) {
 	cfg, err := config.LoadAgent()
 
@@ -400,6 +403,58 @@ func sendMetricsButch(metrics []metricModel.Metric) {
 	}
 }
 
+func sendMetricsButchGRPC(metrics []metricModel.Metric) {
+	// Установка gRPC соединения
+	conn, err := createGRPCConnection("127.0.0.1:3200")
+	if err != nil {
+		log.Printf("Failed to connect: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// Создание gRPC клиента
+	client := pb.NewMetricServiceClient(conn)
+
+	// Преобразование метрик в формат protobuf
+	pbMetrics := make([]*pb.Metric, len(metrics))
+	for i, m := range metrics {
+		pbMetric := &pb.Metric{
+			Id:   m.ID,
+			Type: metric.MetricTypeToProto(m.MType),
+		}
+
+		switch m.MType {
+		case metricModel.MetricTypeGauge:
+			if m.Value != nil {
+				pbMetric.Value = *m.Value
+			}
+		case metricModel.MetricTypeCounter:
+			if m.Delta != nil {
+				pbMetric.Delta = *m.Delta
+			}
+		}
+
+		pbMetrics[i] = pbMetric
+	}
+
+	// Отправка метрик
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	response, err := client.SendMetricsBatch(ctx, &pb.SendMetricsBatchRequest{Metrics: pbMetrics})
+	if err != nil {
+
+		log.Printf("Failed to send metrics via gRPC: %v", err)
+		return
+	}
+
+	if response.Success {
+		log.Printf("Metrics sent successfully via gRPC. Message: %s", response.Message)
+	} else {
+		log.Printf("Failed to send metrics via gRPC. Message: %s", response.Message)
+	}
+}
+
 func getIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -448,4 +503,8 @@ func createMetricFromUint32(name string, typeMetric metricModel.MetricType, valu
 	floatValue := float64(value)
 	metric.Value = &floatValue
 	return metric
+}
+
+func createGRPCConnection(address string) (*grpc.ClientConn, error) {
+	return grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 }

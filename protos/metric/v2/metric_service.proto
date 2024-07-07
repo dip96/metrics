@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package metrics.v2;
+
+import "protos/metric/base/base.proto";
+
+option go_package = "github.com/dip96/metrics/protobuf/protos/metric/v2";
+
+message AddMetricV2Request {
+  base.Metric metric = 1;
+}
+
+message AddMetricV2Response {
+  base.Metric metric = 1;
+}
+
+service MetricService {
+  rpc AddMetricV2(AddMetricV2Request) returns (AddMetricV2Response);
+  rpc GetMetricV2(AddMetricV2Request) returns (AddMetricV2Response);
+}

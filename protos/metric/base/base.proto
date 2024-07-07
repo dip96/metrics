@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package metrics.base;
+
+option go_package = "github.com/dip96/metrics/protobuf/protos/metric/base";
+
+enum MetricType {
+  GAUGE = 0;
+  COUNTER = 1;
+}
+
+message Metric {
+  string id = 1;
+  MetricType type = 2;
+  double value = 3;
+  int64 delta = 4;
+}
