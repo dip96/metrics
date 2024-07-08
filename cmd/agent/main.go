@@ -12,7 +12,8 @@ import (
 	"github.com/dip96/metrics/internal/hash"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
 	"github.com/dip96/metrics/internal/utils"
-	pb "github.com/dip96/metrics/protobuf/metrics"
+	pbBase "github.com/dip96/metrics/protobuf/protos/metric/base"
+	pbV2 "github.com/dip96/metrics/protobuf/protos/metric/v1"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 	"google.golang.org/grpc"
@@ -413,12 +414,12 @@ func sendMetricsButchGRPC(metrics []metricModel.Metric) {
 	defer conn.Close()
 
 	// Создание gRPC клиента
-	client := pb.NewMetricServiceClient(conn)
+	client := pbV2.NewMetricServiceClient(conn)
 
 	// Преобразование метрик в формат protobuf
-	pbMetrics := make([]*pb.Metric, len(metrics))
+	pbMetrics := make([]*pbBase.Metric, len(metrics))
 	for i, m := range metrics {
-		pbMetric := &pb.Metric{
+		pbMetric := &pbBase.Metric{
 			Id:   m.ID,
 			Type: metric.MetricTypeToProto(m.MType),
 		}
@@ -441,7 +442,7 @@ func sendMetricsButchGRPC(metrics []metricModel.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	response, err := client.SendMetricsBatch(ctx, &pb.SendMetricsBatchRequest{Metrics: pbMetrics})
+	response, err := client.SendMetricsBatch(ctx, &pbV2.SendMetricsBatchRequest{Metrics: pbMetrics})
 	if err != nil {
 
 		log.Printf("Failed to send metrics via gRPC: %v", err)

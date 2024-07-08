@@ -18,7 +18,6 @@ import (
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
-	pbV1 "github.com/dip96/metrics/protobuf/protos/metric/v1"
 	pbV2 "github.com/dip96/metrics/protobuf/protos/metric/v2"
 	echopprof "github.com/hiko1129/echo-pprof"
 	"github.com/labstack/echo/v4"
@@ -469,7 +468,6 @@ func runGRPCServer(addr string, metricService *metric.MetricService) (*grpc.Serv
 		return nil, fmt.Errorf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer()
-	pbV1.RegisterMetricServiceServer(s, metricService)
 	pbV2.RegisterMetricServiceServer(s, metricService)
 	log.Printf("Starting gRPC server on %s", addr)
 	go func() {

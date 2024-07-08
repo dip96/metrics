@@ -16,8 +16,7 @@ import (
 )
 
 type MetricService struct {
-	//pbV1.UnimplementedMetricServiceServer
-	//pbV2.UnimplementedMetricServiceServer
+	pbV2.UnimplementedMetricServiceServer
 	storage storage.StorageInterface
 }
 
