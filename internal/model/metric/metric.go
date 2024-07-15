@@ -11,6 +11,9 @@ func (m Metric) GetValueForDisplay() (string, error) {
 	}
 
 	if m.MType == MetricTypeGauge {
+		if m.FullValueGauge == "" {
+			return fmt.Sprintf("%f", *m.Value), nil
+		}
 		return m.FullValueGauge, nil
 	}
 

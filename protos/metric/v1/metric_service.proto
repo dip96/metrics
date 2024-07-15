@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package metrics.v1;
+
+import "protos/metric/base/base.proto";
+
+option go_package = "github.com/dip96/metrics/protobuf/protos/metric/v1";
+
+message AddMetricRequest {
+  base.MetricType type = 1;
+  string name = 2;
+  string value = 3;
+}
+
+message AddMetricResponse {
+  bool success = 1;
+}
+
+message SendMetricsBatchRequest {
+  repeated base.Metric metrics = 1;
+}
+
+message SendMetricsBatchResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetMetricRequest {
+  base.MetricType type = 1;
+  string name = 2;
+}
+
+message GetMetricResponse {
+  string value = 1;
+}
+
+message GetAllMetricsHTMLRequest {}
+
+message GetAllMetricsHTMLResponse {
+  string html_content = 1;
+}
+
+service MetricService {
+  rpc AddMetric(AddMetricRequest) returns (AddMetricResponse);
+  rpc GetMetric(GetMetricRequest) returns (GetMetricResponse);
+  rpc GetAllMetricsHTML(GetAllMetricsHTMLRequest) returns (GetAllMetricsHTMLResponse);
+  rpc SendMetricsBatch(SendMetricsBatchRequest) returns (SendMetricsBatchResponse);
+}

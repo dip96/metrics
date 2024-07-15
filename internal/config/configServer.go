@@ -30,6 +30,8 @@ type Server struct {
 	CryptoKey string `json:"crypto_key"`
 	// Config - путь до файла конфигурации
 	Config string
+	// TrustedSubnet -  строковое представление бесклассовой адресации (CIDR)
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 // serverConfig - глобальная переменная, содержащая конфигурацию сервера.
@@ -67,6 +69,7 @@ func initServerConfig() (*Server, error) {
 	serverFlags.StringVar(&cfg.MigrationPath, "m", "file:./migrations", "")
 	serverFlags.StringVar(&cfg.Key, "k", "", "key")
 	serverFlags.StringVar(&cfg.Config, "c", "/home/dip96/go_project/src/metrics/config_server.json", "Config path")
+	serverFlags.StringVar(&cfg.TrustedSubnet, "t", "", "")
 
 	if cfg.Config != "" {
 		err := readConfigFileServer(cfg.Config, &cfg)
@@ -106,6 +109,10 @@ func initServerConfig() (*Server, error) {
 
 	if envConfig := os.Getenv("CONFIG"); envConfig != "" {
 		cfg.Config = envConfig
+	}
+
+	if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
+		cfg.TrustedSubnet = envTrustedSubnet
 	}
 
 	return &cfg, nil

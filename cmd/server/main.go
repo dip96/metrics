@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/dip96/metrics/internal/config"
 	"github.com/dip96/metrics/internal/database/migrator"
+	"github.com/dip96/metrics/internal/grpcservices/metric"
 	"github.com/dip96/metrics/internal/hash"
 	"github.com/dip96/metrics/internal/middleware"
 	metricModel "github.com/dip96/metrics/internal/model/metric"
@@ -17,9 +18,12 @@ import (
 	memStorage "github.com/dip96/metrics/internal/storage/mem"
 	postgresStorage "github.com/dip96/metrics/internal/storage/postgres"
 	"github.com/dip96/metrics/internal/utils"
+	pbV2 "github.com/dip96/metrics/protobuf/protos/metric/v2"
 	echopprof "github.com/hiko1129/echo-pprof"
 	"github.com/labstack/echo/v4"
+	"google.golang.org/grpc"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,6 +31,11 @@ import (
 	"syscall"
 	"time"
 )
+
+type Servers struct {
+	Echo *echo.Echo
+	GRPC *grpc.Server
+}
 
 var (
 	buildVersion = "N/A"
@@ -369,6 +378,7 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.Logger)
+	e.Use(middleware.CheckIP)
 	e.Use(middleware.CheckHash)
 	e.Use(middleware.UnzipMiddleware)
 	e.Use(middleware.DecodeMiddleware)
@@ -408,6 +418,19 @@ func main() {
 		storage.Storage = memStorage.NewStorage()
 	}
 
+	// Создаем экземпляр MetricService
+	metricService := metric.NewMetricService(storage.Storage)
+
+	// Запускаем gRPC сервер
+	grpcServer, err := runGRPCServer("127.0.0.1:3200", metricService)
+	if err != nil {
+		log.Fatalf("Failed to run gRPC server: %v", err)
+	}
+	servers := &Servers{
+		Echo: e,
+		GRPC: grpcServer,
+	}
+
 	// Канал для сигналов завершения
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
@@ -434,23 +457,41 @@ func main() {
 	<-stop
 
 	// Запускаем graceful shutdown
-	if err := gracefulShutdown(e, storage.Storage); err != nil {
+	if err := gracefulShutdown(servers, storage.Storage); err != nil {
 		log.Fatalf("Error during graceful shutdown: %v", err)
 	}
 }
 
-func gracefulShutdown(e *echo.Echo, store storage.StorageInterface) error {
+func runGRPCServer(addr string, metricService *metric.MetricService) (*grpc.Server, error) {
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen: %v", err)
+	}
+	s := grpc.NewServer()
+	pbV2.RegisterMetricServiceServer(s, metricService)
+	log.Printf("Starting gRPC server on %s", addr)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve gRPC: %v", err)
+		}
+	}()
+	return s, nil
+}
+
+func gracefulShutdown(servers *Servers, store storage.StorageInterface) error {
 	// Устанавливаем таймаут для завершения
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Останавливаем сервер
-	if err := e.Shutdown(ctx); err != nil {
-		log.Printf("Error shutting down server: %v", err)
+	// Останавливаем HTTP сервер
+	if err := servers.Echo.Shutdown(ctx); err != nil {
+		log.Printf("Error shutting down HTTP server: %v", err)
 	}
 
+	// Останавливаем gRPC сервер
+	servers.GRPC.GracefulStop()
+
 	// Ожидаем завершения всех текущих запросов
-	// Это время также используется для завершения сохранения метрик
 	<-ctx.Done()
 
 	// Закрываем соединение с базой данных
